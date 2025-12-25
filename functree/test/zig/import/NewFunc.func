@@ -1,0 +1,19 @@
+name: str,
+count: usize = 0,
+
+pub fn a(name: str, count: usize) NewFunc {
+  const self = NewFunc{name = name, count = count};
+  return self;
+}
+pub fn x1(self: NewFunc) void {
+  _ = self;
+}
+pub fn x2(array: []u32) []u32 {
+  code(
+    '''
+    const std = @import("std");
+    std.debug.print("test zig code.\n", .{});
+    '''
+  );
+  return array;
+}

@@ -1,0 +1,13 @@
+name: str,
+count: usize = 0,
+
+pub fn a(name: str, count: usize) Import {
+  const self = Import{name=name,count=count};
+  return self;
+}
+pub fn x1(self: Import) void {
+  _=self;
+}
+pub fn x2(integer: []u32) []u32 {
+  return integer;
+}

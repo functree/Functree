@@ -1,0 +1,20 @@
+code(
+'''
+const std = @import("std");
+'''
+);
+
+pub fn a() Console {
+    const self = Console{};
+    return self;
+}
+
+pub fn print(string: str) void {
+    std.debug.print("{s}", .{string});
+}
+pub fn println(string: str) void {
+    std.debug.print("{s}\n", .{string});
+}
+pub fn printFormat(comptime format: str, args: anytype) void {
+    std.debug.print(format, args);
+}

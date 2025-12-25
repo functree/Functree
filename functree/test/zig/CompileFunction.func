@@ -1,0 +1,25 @@
+pub fn main() void {
+  _ = x();
+
+  var array: []u32 = [1,2,3];
+  _ = x2(&array);
+
+  _ = Import.x2(&array);
+  const name = "abc";
+  const count: usize = 1;
+  const x3 = Import.a(name,count);
+  x3.x1();
+
+  _ = NewFunc.x2(&array);
+}
+
+fn x() void {
+  const array: [3]i32 = [1,2,3];
+  _ = array[2];
+}
+fn x2(integer: []u32) []u32 {
+  return integer;
+}
+
+const Import = import("functree/test/zig/Import.func");
+import("functree/test/zig/import/*");

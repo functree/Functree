@@ -1,0 +1,145 @@
+pub fn main() void {
+  _ = pointer_int.*;
+  var u32_1: u32 = 1;
+  pointer_u32 = &u32_1;
+
+  if (color == .red) {
+    const abc = 1;
+    _ = abc;
+  } else {
+    const def = 2;
+    _ = def;
+  }
+
+  switch (color){
+    .red => {
+      u32_1 = 1;
+    },
+    .green => {
+      u32_1 = 2;
+    },
+    else => {
+      u32_1 = 3;
+    },
+  }
+
+  while (u32_1 < 3) {
+    u32_1 = u32_1 + 1;
+    if (int_1 == 1) {
+      break;
+    }
+  }
+}
+
+//typedef
+const array_u8 = []u8;
+
+//const
+const int_1 = 1;
+pub const float_16:f16 = -1.2;
+const bool_true = true;
+const bool_false = false;
+
+//expression
+const expression = 2.1-1*2+1;
+var expression2 = bool_true or false and bool_false;
+var expression3: f16 = float_16/ (int_1+(2*5/2)-3)+1;
+
+//pointer
+const pointer_int = &int_1;
+var pointer_u32: *u32 = undefined;
+
+//param
+param_1:i64 = 1,
+
+//array
+const array: [3]i32 = [1,2,3];
+const array2: [3][2]i32 = [
+    [11,12],
+    [21,22],
+    [31,32]
+];
+const array3:[3][2][1]i32 = [
+  [
+    [11],
+    [12]
+  ],
+  [
+    [21],
+    [22]
+  ],
+  [
+    [31],
+    [32]
+  ]
+];
+var array_ref = 1 + array[0];
+var array2_ref = 1 + array2[0][1];
+const array_slice = array[0..2];
+const array2_slice = &array2;
+//slice
+const slice: []i32 = [1,2,3];
+var slice_ref = 1 + slice[0];
+
+//char
+var char = 'A';
+var ch2 = '\\';
+var ch3 = '\x65';
+var ch4 = '💯';
+var ch5 = '中';
+var ch6 = '\u{1f4a9}';
+
+//string
+var str1 = "str ;i\ng";
+var str2 = "\xf0\x9f\x92\xaf";
+var str3 = "h\x65llo";
+const str4 = "ab" ++ str1;
+const str5 = "ab" ++ str1 ++ "cd";
+
+//multiline_string
+const multiline_string='''
+    adad;
+    sd
+  ''';
+
+//enum
+const Color = enum{
+  red,
+  green,
+  blue,
+};
+const Color_2 = enum(u8){
+  red,
+  green,
+  blue,
+};
+const color = Color.red;
+
+//error
+const FileOpenError = error{
+    AccessDenied,
+    OutOfMemory,
+    FileNotFound,
+};
+
+//func(struct)
+const Result = func{
+    name: []u8,
+    age: u32,
+};
+const r = Result{
+    name = "a",
+    age = 3+int_1,
+};
+//tuple
+const Tuple = func{
+    []u8,
+    u32,
+};
+const tuple = Tuple{"1",2+1};
+const Tuple2 = struct{
+    []u8,
+    u32,
+};
+const tuple2 = Tuple2{"1",2+1};
+import("functree/test/zig/import/*");

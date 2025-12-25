@@ -1,0 +1,21 @@
+//!第一个程序
+const Console = import("functree/app/Console.func");
+const Config = import("functree/system/Config.func");
+
+///程序入口
+pub fn main() void {
+    Console.print("Hello, world!\n");
+}
+
+test "Hello: test" {
+    const string = "hello world!\n";
+    //Console.print(string);
+    Console.printFormat("format:{s}", .{string});
+
+    _ = Console.a();
+}
+
+test "global var"{
+   _ = Config.j; // Config.j = 4
+   Config.getName();
+}

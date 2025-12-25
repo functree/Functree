@@ -1,0 +1,36 @@
+code(
+'''
+const std = @import("std");
+
+pub const j = i + 3;
+const i: i32 = 1;
+pub fn getName() void {}
+
+pub const zig_version: usize = parseVersion("0.15.2") catch unreachable;
+pub const zig_version_string: []const u8 = "0.15.2";
+pub const single_thread = false;
+pub const os = std.Target.Os{
+    .tag = .windows,
+    .version_range = .{ .windows = .{
+        .min = .win10_fe,
+        .max = .win10_fe,
+    }}
+};
+
+pub fn parseVersion(text: []const u8) !usize {
+    var it = std.mem.splitScalar(u8, text, '.');
+    const ver = try parseNum(it.first())*1000 + try parseNum(it.next())*1000 + try parseNum(it.next())*10000;
+
+    return ver;
+}
+fn parseNum(text: []const u8) error{ InvalidVersion, Overflow }!usize {
+    // Leading zeroes are not allowed.
+    if (text.len > 1 and text[0] == '0') return error.InvalidVersion;
+
+    return std.fmt.parseUnsigned(usize, text, 10) catch |err| switch (err) {
+        error.InvalidCharacter => return error.InvalidVersion,
+        error.Overflow => return error.Overflow,
+    };
+}
+'''
+);
