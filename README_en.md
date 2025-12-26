@@ -130,9 +130,9 @@ Escape Sequences:
 | \t | 09 | Horizontal tab: `const string = "\tHello World!";` |
 | \n | 10 | Line feed: `const string = "Hello World!\n";` |
 | \r | 13 | Carriage return: `const char = '\r';` |
-| \" | 34 | Double quote |
-| \' | 39 | Single quote |
-| \\ | 92 | Backslash |
+| \\" | 34 | Double quote |
+| \\' | 39 | Single quote |
+| \\\ | 92 | Backslash |
 | \xNN | | 8-bit byte value (2 hex digits): `const char = '\x41'; // 'A'` or `const string = "h\x65llo"; // "hello"` or `const string = "\xf0\x9f\x92\xaf"; // "💯"` |
 | \u{NNNNNN} | | Unicode code point value (1 or more hex digits): `const char = '\u{4e2d}'; // '中'` |
 
