@@ -10,18 +10,18 @@
 
 ## Running, Testing, and Building
 * The current behaviors implemented by `Functree.exe` include: `run`, `test`, `build-exe`, `build-lib`, `build-obj`.
-* Therefore, from the `Functree` root directory, you can execute the following commands to run, test, or compile target function source files:
-    `Functree run functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`
-    `Functree test functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`
-    `Functree build-exe functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`
-    `Functree build-lib functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`
-    `Functree build-obj functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`
+* Therefore, from the `Functree` root directory, you can execute the following commands to run, test, or compile target function source files:  
+    `Functree run functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+    `Functree test functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+    `Functree build-exe functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+    `Functree build-lib functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+    `Functree build-obj functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
 * Examples:
-    `zig test Functree.zig`
-    `Functree test functree/app/Hello.func`
-    `Functree run functree/app/Hello.func -target x86_64-windows`
-    `Functree build-exe functree/app/Hello.func -target x86_64-windows -O ReleaseFast`
-    `functree_app_Hello.exe`
+    `zig test Functree.zig`  
+    `Functree test functree/app/Hello.func`  
+    `Functree run functree/app/Hello.func -target x86_64-windows`  
+    `Functree build-exe functree/app/Hello.func -target x86_64-windows -O ReleaseFast`  
+    `functree_app_Hello.exe`  
 
 ## Specification
 

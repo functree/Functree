@@ -10,18 +10,18 @@
 
 ## 运行、测试与编译
  * 目前`Functree.exe`实现的行为包括：`run`、`test`、`build-exe`、`build-lib`、`build-obj`；
- * 因此，进入`Functree`根目录，可执行下列命令，以运行、测试、编译目标功件源文件：
- `Functree run functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`
- `Functree test functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`
- `Functree build-exe functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`
- `Functree build-lib functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`
- `Functree build-obj functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`
- * 示例：
- `zig test Functree.zig`
- `Functree test functree/app/Hello.func`
- `Functree run functree/app/Hello.func -target x86_64-windows`
- `Functree build-exe functree/app/Hello.func -target x86_64-windows -O ReleaseFast`
- `functree_app_Hello.exe`
+ * 因此，进入`Functree`根目录，可执行下列命令，以运行、测试、编译目标功件源文件：  
+ `Functree run functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+ `Functree test functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+ `Functree build-exe functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+ `Functree build-lib functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+ `Functree build-obj functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+ * 示例：  
+ `zig test Functree.zig`  
+ `Functree test functree/app/Hello.func`  
+ `Functree run functree/app/Hello.func -target x86_64-windows`  
+ `Functree build-exe functree/app/Hello.func -target x86_64-windows -O ReleaseFast`  
+ `functree_app_Hello.exe`  
 
 ## 规范
 
