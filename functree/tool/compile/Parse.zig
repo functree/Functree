@@ -180,7 +180,7 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
                     // std.debug.print("nnnnnnnn{s},{s},  {d}\n", .{ self.current_token.text, self.previous_utf8_char, current_statement.token_list.items.len });
                     return self.fail(.invalid_space, &current_statement, self.current_token_index);
                 }
-                if (self.statementNotFinished() or self.current_token_state == .period_l_brace) {
+                if (self.statementNotFinished()) {
                     //暂时不处理注释内容
                     if (self.current_token_state == .line_comment_start) {
                         // std.debug.print("current_token={s},{any}\n", .{ self.current_token.text, self.current_token.token_type });
@@ -193,7 +193,11 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
                         self.current_token.column_no = 1;
                         self.current_token_state = .start;
                     } else {
-                        try self.parseTokenFinished(&current_statement);
+                        if (self.current_token_state != .period_l_brace) {
+                            try self.parseTokenFinished(&current_statement);
+                        } else {
+                            continue;
+                        }
                     }
                     if (current_statement.code_type == .switch_case_block and Util.isEql(self.previous_utf8_char, ",")) {
                         // std.debug.print(">>>>>>>>>>>{s}  {any}  {any}\n", .{ self.current_token.text, self.current_token.token_type, current_statement.code_type });
@@ -230,24 +234,15 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
             self.previous_utf8_char = " ";
             continue;
         }
-        if (Util.isEql(utf8_char, ",")) {
-            if (current_statement.code_type == .declare_param and self.notInCommentStringLiteral()) {
+        if (Util.isEql(utf8_char, ",") and self.notInCommentStringLiteral()) {
+            if ((current_statement.code_type == .declare_param) or
+                (current_statement.code_type == .switch_case_block and current_statement.token_list.items[current_statement.token_list.items.len - 1].token_type == .l_brace_r_brace))
+            {
                 try self.parseTokenFinished(&current_statement);
                 self.current_token.token_type = .comma;
                 self.current_token.text = ",";
                 self.current_token.column_no = self.current_column_no;
                 try current_statement.appendTokenList(self.current_token);
-                _ = try self.parseStatementFinished(&current_statement);
-                try self.appendCurrentStatement(current_statement, parent_statement);
-                current_statement = self.initCurrentStatement(parent_statement);
-                continue;
-            } else if (current_statement.code_type == .switch_case_block and current_statement.token_list.items[current_statement.token_list.items.len - 1].token_type == .l_brace_r_brace) {
-                try self.parseTokenFinished(&current_statement);
-                self.current_token.token_type = .comma;
-                self.current_token.text = ",";
-                self.current_token.column_no = self.current_column_no;
-                try current_statement.appendTokenList(self.current_token);
-                // std.debug.print("nnnnnnnn{s}  {any}\n", .{ self.current_token.text, self.current_token.token_type });
                 _ = try self.parseStatementFinished(&current_statement);
                 try self.appendCurrentStatement(current_statement, parent_statement);
                 current_statement = self.initCurrentStatement(parent_statement);
@@ -277,83 +272,109 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
             continue;
         }
         //code_block start, not "{d}", not `u{0ab1Q}`, not `.{}`, not "'''abc'''"
-        if (Util.isEql(utf8_char, "{") and self.current_token_state != .period and self.notInCommentStringLiteral() and self.current_token_state != .char_literal_unicode_escape_saw_u) {
-            // return FuncName{} or = FuncName{}
-            if (current_statement.code_type != CodeType.define_fn and current_statement.token_list.items.len > 0) {
-                const first_letter = if (self.current_token.token_type != .unkown) self.current_token.text[0] else current_statement.token_list.items[current_statement.token_list.items.len - 1].text[0];
-                if (first_letter >= 'A' and first_letter <= 'Z') {
-                    current_statement.is_container = true;
+        if (Util.isEql(utf8_char, "{") and self.notInCommentStringLiteral() and self.current_token_state != .char_literal_unicode_escape_saw_u) {
+            if (self.current_token_state != .period) {
+                // return FuncName{} or = FuncName{}
+                if (current_statement.code_type != CodeType.define_fn and current_statement.token_list.items.len > 0) {
+                    const first_letter = if (self.current_token.token_type != .unkown) self.current_token.text[0] else current_statement.token_list.items[current_statement.token_list.items.len - 1].text[0];
+                    if (first_letter >= 'A' and first_letter <= 'Z') {
+                        current_statement.is_container = true;
+                    }
                 }
-            }
-            // if is "{}", and not FuncName{}
-            if (!current_statement.is_container and Util.isEql(self.next_utf8_char, "}")) {
-                if (self.current_token.token_type != .unkown) {
-                    try self.parseTokenFinished(&current_statement);
+                // if is "{}", and not FuncName{}
+                if (!current_statement.is_container and Util.isEql(self.next_utf8_char, "}")) {
+                    if (self.current_token.token_type != .unkown) {
+                        try self.parseTokenFinished(&current_statement);
+                    }
+                    self.current_token.token_type = .l_brace_r_brace;
+                    self.current_token.text = "{}";
+                    try current_statement.appendTokenList(self.current_token);
+                    self.current_list_index += 1;
+                    self.current_column_no += 1;
+                    self.current_token = Token.init(.unkown, self.current_line_no, self.current_column_no);
+                    self.current_token_state = .start;
+                    continue;
                 }
-                self.current_token.token_type = .l_brace_r_brace;
-                self.current_token.text = "{}";
+                self.block_count += 1;
+                try self.parseTokenFinished(&current_statement);
+                self.current_token.token_type = .l_brace;
+                self.current_token.text = "{";
+                self.current_token.column_no = self.current_column_no;
                 try current_statement.appendTokenList(self.current_token);
+                if (!current_statement.is_container) {
+                    if (current_statement.code_type == CodeType.unkown) {
+                        current_statement.code_type = ._block; // code_type = ._block
+                    } else if (current_statement.code_type == CodeType.invalid) {
+                        return self.fail(.invalid_code_type, &current_statement, self.current_token_index);
+                    }
+                    _ = try self.parseStatementFinished(&current_statement);
+                    self.previous_utf8_char = "{";
+                    try self.parseStatementAndToken(list, &current_statement);
+                    try self.appendCurrentStatement(current_statement, parent_statement);
+                    // std.debug.print("_block current_statement child_list = {d}\n", .{current_statement.line_no});
+                    if (Util.isEql(self.previous_utf8_char, "}")) {
+                        current_statement = self.initCurrentStatement(parent_statement);
+                    } else {
+                        return self.fail(.expected_r_brace, &current_statement, self.current_token_index);
+                    }
+                } else {
+                    self.current_token = Token.init(.unkown, self.current_line_no, self.current_column_no);
+                    self.current_token_state = .start;
+                    self.previous_utf8_char = "";
+                }
+                continue;
+            } else if (current_statement.token_list.items[current_statement.token_list.items.len - 1].token_type == .period_l_brace) { // .{.{
+                self.previous_utf8_char = "{";
+                self.current_token.token_type = .period_l_brace;
+                self.current_token.text = ".{";
+                try current_statement.appendTokenList(self.current_token);
+                current_statement.state = .period_init_start2;
                 self.current_list_index += 1;
                 self.current_column_no += 1;
                 self.current_token = Token.init(.unkown, self.current_line_no, self.current_column_no);
                 self.current_token_state = .start;
                 continue;
             }
-            self.block_count += 1;
-            try self.parseTokenFinished(&current_statement);
-            self.current_token.token_type = .l_brace;
-            self.current_token.text = "{";
-            self.current_token.column_no = self.current_column_no;
-            try current_statement.appendTokenList(self.current_token);
-            if (!current_statement.is_container) {
-                if (current_statement.code_type == CodeType.unkown) {
-                    current_statement.code_type = ._block; // code_type = ._block
-                } else if (current_statement.code_type == CodeType.invalid) {
-                    return self.fail(.invalid_code_type, &current_statement, self.current_token_index);
-                }
-                _ = try self.parseStatementFinished(&current_statement);
-                self.previous_utf8_char = "{";
-                try self.parseStatementAndToken(list, &current_statement);
-                try self.appendCurrentStatement(current_statement, parent_statement);
-                // std.debug.print("_block current_statement child_list = {d}\n", .{current_statement.line_no});
-                if (Util.isEql(self.previous_utf8_char, "}")) {
-                    current_statement = self.initCurrentStatement(parent_statement);
-                } else {
-                    return self.fail(.expected_r_brace, &current_statement, self.current_token_index);
-                }
-            } else {
-                self.current_token = Token.init(.unkown, self.current_line_no, self.current_column_no);
-                self.current_token_state = .start;
-                self.previous_utf8_char = "";
-            }
-            continue;
         }
         //code_block end, not `u{0ab1Q}`, not `.{}`
-        if (Util.isEql(utf8_char, "}") and current_statement.state != .period_init_start and self.notInCommentStringLiteral() and self.current_token_state != .char_literal_unicode_escape) {
-            if (current_statement.code_type == .unkown and Util.isEql(self.next_utf8_char, ";")) {
-                self.current_list_index += 1;
-            }
-            self.previous_utf8_char = "}";
-            if (!current_statement.is_container) {
-                if (current_statement.code_type != CodeType.unkown) {
-                    if (current_statement.code_type == CodeType.invalid) {
-                        return self.fail(.invalid_code_type, &current_statement, self.current_token_index);
-                    } else {
-                        try self.appendCurrentStatement(current_statement, parent_statement);
-                    }
+        if (Util.isEql(utf8_char, "}") and self.notInCommentStringLiteral() and self.current_token_state != .char_literal_unicode_escape) {
+            if (current_statement.state != .period_init_start and current_statement.state != .period_init_start2) {
+                if (current_statement.code_type == .unkown and Util.isEql(self.next_utf8_char, ";")) {
+                    self.current_list_index += 1;
                 }
-                break;
+                self.previous_utf8_char = "}";
+                if (!current_statement.is_container) {
+                    if (current_statement.code_type != CodeType.unkown) {
+                        if (current_statement.code_type == CodeType.invalid) {
+                            return self.fail(.invalid_code_type, &current_statement, self.current_token_index);
+                        } else {
+                            try self.appendCurrentStatement(current_statement, parent_statement);
+                        }
+                    }
+                    break;
+                } else {
+                    try self.parseTokenFinished(&current_statement);
+                    self.current_token.token_type = .r_brace;
+                    self.current_token.text = "}";
+                    self.current_token.column_no = self.current_column_no;
+                    try current_statement.appendTokenList(self.current_token);
+                    self.current_token = Token.init(.unkown, self.current_line_no, self.current_column_no);
+                    self.current_token_state = .start;
+                    if (current_statement.is_fn) {
+                        current_statement.is_container = false;
+                    }
+                    continue;
+                }
             } else {
+                current_statement.state = .period_init_start;
                 try self.parseTokenFinished(&current_statement);
+                self.previous_utf8_char = "}";
                 self.current_token.token_type = .r_brace;
                 self.current_token.text = "}";
                 self.current_token.column_no = self.current_column_no;
                 try current_statement.appendTokenList(self.current_token);
                 self.current_token = Token.init(.unkown, self.current_line_no, self.current_column_no);
                 self.current_token_state = .start;
-                if (current_statement.is_fn) {
-                    current_statement.is_container = false;
-                }
                 continue;
             }
         }
@@ -1465,9 +1486,15 @@ fn parseArrayTypeSizeNode(self: *Parse, current_statement: *Statement) Error!Nod
         var left_side = null_node;
         // [*]i32
         if (token_type == .asterisk) {
-            const node = CodeNode.init(self.current_token_index, .identifier, null_node, null_node);
+            const node = CodeNode.init(self.current_token_index, .pointer_type, null_node, null_node);
             left_side = try current_statement.appendNode(node);
             self.incTokenIndex();
+        } else if (token_type == .colon) { // [:0]u8
+            const colon_token_index = self.current_token_index;
+            self.incTokenIndex();
+            const right_node_index = try self.parseExpressionNode(current_statement);
+            const node = CodeNode.init(colon_token_index, .slice_sentinel, null_node, right_node_index);
+            left_side = try current_statement.appendNode(node);
         } else {
             left_side = try self.parseExpressionNode(current_statement);
         }
@@ -1662,9 +1689,6 @@ fn parseFuncInitArgListNode(self: *Parse, current_statement: *Statement) Error!N
         if (self.getCurrentToken(current_statement).token_type == .comma) {
             self.incTokenIndex();
             continue;
-        }
-        if (self.getCurrentToken(current_statement).token_type == .period) {
-            self.incTokenIndex();
         }
         const arg_node_index = try self.parseOneFuncInitArgNode(current_statement);
         if (arg_node_start == null_node) {
@@ -2675,9 +2699,6 @@ fn parseExpressionValueNode(self: *Parse, current_statement: *Statement) Error!N
                 if (self.getCurrentToken(current_statement).token_type == .comma) {
                     self.incTokenIndex();
                     continue;
-                }
-                if (self.getCurrentToken(current_statement).token_type == .period) {
-                    self.incTokenIndex();
                 }
                 const arg_node_index = try self.parseOneFuncInitArgNode(current_statement);
                 if (arg_node_start == null_node) {

@@ -2,7 +2,7 @@ name: str,
 count: usize = 0,
 
 pub fn a(name: str, count: usize) Import {
-  const self = Import{name=name,count=count};
+  const self = Import{.name=name,.count=count};
   return self;
 }
 pub fn x1(self: Import) void {

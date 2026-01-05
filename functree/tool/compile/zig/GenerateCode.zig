@@ -110,8 +110,12 @@ fn generateTargetStatementList(self: *GenerateCode) !void {
         try self.target_statement_list.append(self.allocator, target_statement);
         i += 1;
     }
-    const last_period_pos = std.mem.lastIndexOf(u8, self.func.name, ".");
-    const import_line = try Util.concat(self.allocator, &.{ "\nconst ", self.func.name[last_period_pos.? + 1 ..], "=@This();" });
+    var func_name = self.func.name;
+    const last_period_pos = std.mem.lastIndexOf(u8, func_name, ".");
+    if (last_period_pos != null) {
+        func_name = func_name[last_period_pos.? + 1 ..];
+    }
+    const import_line = try Util.concat(self.allocator, &.{ "\nconst ", func_name, "=@This();" });
     var target_statement = TargetStatement.init(self.allocator, line_no + 1);
     try target_statement.appendCodeLineList(import_line);
     try self.target_statement_list.append(self.allocator, target_statement);
@@ -898,8 +902,13 @@ fn generateArrayTypeSizeText(self: *GenerateCode, statement: Statement, node_ind
     const this_node = statement.getNode(node_index);
     if (this_node.left_side != null_node) {
         const left_node = statement.getNode(this_node.left_side);
-        const array_size_token_text = generateCodeByTokenIndex(statement, left_node.main_token);
-        text = try Util.concat(statement.arena, &.{ text, array_size_token_text, "]" });
+        if (left_node.node_type == .slice_sentinel) {
+            const slice_sentinel_text = try self.generateIdentifierText(statement, left_node.right_side);
+            text = try Util.concat(statement.arena, &.{ text, ":", slice_sentinel_text, "]" });
+        } else {
+            const array_size_token_text = generateCodeByTokenIndex(statement, left_node.main_token);
+            text = try Util.concat(statement.arena, &.{ text, array_size_token_text, "]" });
+        }
     } else {
         text = try Util.concat(statement.arena, &.{ text, "]" });
     }
@@ -954,7 +963,7 @@ fn generateFuncInitArgText(self: *GenerateCode, statement: Statement, arg_node_i
     if (statement.getToken(arg_node.main_token).token_type == .equal) {
         const left_side = arg_node.left_side;
         var text = try self.generateIdentifierAndTypeText(statement, left_side);
-        text = try Util.concat(statement.arena, &.{ ".", text, " = " });
+        text = try Util.concat(statement.arena, &.{ text, " = " });
 
         const right_side = arg_node.right_side;
         const right_text = try self.generateExpressionText(statement, right_side);

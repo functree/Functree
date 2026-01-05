@@ -128,8 +128,8 @@ const Result = func{
     age: u32,
 };
 const r = Result{
-    name = "a",
-    age = 3+int_1,
+    .name = "a",
+    .age = 3+int_1,
 };
 //tuple
 const Tuple = func{

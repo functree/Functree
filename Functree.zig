@@ -13,7 +13,7 @@ const output_dir_name = ".funcfile";
 var general_purpose_allocator = std.heap.GeneralPurposeAllocator(.{}){};
 
 const normal_usage =
-    \\Usage: Functree [source file path]
+    \\Usage: Functree [command] [source file path]
 ;
 
 pub fn main() !void {
@@ -21,9 +21,6 @@ pub fn main() !void {
     var arena_instance = std.heap.ArenaAllocator.init(gpa);
     defer arena_instance.deinit();
     const arena = arena_instance.allocator();
-
-    // const source_file_path: Str = "functree/functree/System.func";
-    // const output_type = Compile.OutPutTypeMap.get("run");
 
     var out_put_type_str: Str = "";
     var source_file_path: Str = "";

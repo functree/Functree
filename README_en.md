@@ -16,7 +16,7 @@
     `Functree build-exe functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
     `Functree build-lib functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
     `Functree build-obj functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
-* Examples:
+* Examples:  
     `zig test Functree.zig`  
     `Functree test functree/app/Hello.func`  
     `Functree run functree/app/Hello.func -target x86_64-windows`  
@@ -1171,6 +1171,7 @@ fn addOne(number: i32) i32 {
 | bool | Boolean type |
 | break | Exit from loop |
 | catch | Catch error value |
+| code | Embed code |
 | comptime | Ensures expression evaluated at compile time |
 | comptime_int | **Compile-time known** integer literal type |
 | comptime_float | **Compile-time known** floating-point literal type |
@@ -1204,4 +1205,3 @@ fn addOne(number: i32) i32 {
 | var | Define mutable variable |
 | void | Zero-bit type |
 | while | Conditional loop statement, executes while condition is `true` or not `null` |
-| code | Embed code |

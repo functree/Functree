@@ -64,6 +64,7 @@ pub const DependType = enum {
 };
 pub const StatementState = enum {
     period_init_start,
+    period_init_start2,
     period_init_end,
 };
 
@@ -254,9 +255,14 @@ pub const NodeType = enum {
     type_expr,
     align_type,
     callconv_type,
-    /// `lhs[b..c]`
+    /// `lhs[start..end]`
     /// main_token is the '..'.
     slice,
+    /// `lhs[start..end :sentinel]`
+    /// `lhs[start.. :sentinel]`
+    /// `lhs[:sentinel]`
+    /// main_token is the ':'.
+    slice_sentinel,
     /// `?lhs`. rhs unused. main_token is the `?`.
     optional_type,
     /// lhs is index into ptr_type. rhs is the element type expression.

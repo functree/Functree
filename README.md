@@ -1172,6 +1172,7 @@ fn addOne(number: i32) i32 {
 |bool | 布尔类型 |
 |break | 从循环中退出 |
 |catch | 捕捉错误值 |
+|code | 嵌入代码 |
 |comptime | 确保表达式在编译期计算 |
 |comptime_int | **编译时已知**整数字面值类型 |
 |comptime_float | **编译时已知**浮点数字面值类型 |
@@ -1205,4 +1206,3 @@ fn addOne(number: i32) i32 {
 |var | 定义可以修改的变量 |
 |void | 零位长类型 |
 |while | 条件循环语句，条件为 `true` 或不为 `null` 时执行循环 |
-|code | 嵌入代码 |
