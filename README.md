@@ -1129,15 +1129,15 @@ test "decl access by string" {
  ```
 
 #### 21. 包含代码文件(include)
-语法：`include(comptime code_file_path: []const u8);`。
-这个功能将根据 `code_file_path` 路径**字符串**获取代码文件内容，将代码直接嵌入到**功件文件**的代码中，并与其他代码共享上下文**变量**和**作用域**。
+语法：`include(comptime code_file_path: str);`。
+这个功能将根据 `code_file_path` 路径获取代码文件内容，将代码直接嵌入到**功件文件**的代码中，并与其他代码共享上下文**变量**和**作用域**。
 
-例如，`functree/Config.func`文件内容如下：
+例如，`functree/Config.func`代码文件内容如下：
  ```
 const string = "Hello, world!\n";
  ```
 
-`functree/System.func`文件内容：
+`functree/System.func`代码文件内容如下：
  ```
 const Console = import("functree/system/io/Console.func");
 const print = Console.print;
@@ -1161,10 +1161,10 @@ pub fn main() void {
  ```
 
 #### 22. 引入功件(import)
-语法：`const FuncName = import(comptime func_path: str);` 或 `import(comptime func_path: []const u8);`。
-这个功能将根据 `func_path` 路径**字符串**引入**功件文件**，默认将**功件文件名称**作为变量名称：
+语法：`const FuncName = import(comptime func_path: str);`。
+这个功能将根据 `func_path` 路径引入**功件文件**，应将**功件文件名称**作为变量名称，且其首字母为大写（**TitleCase**）：
  ```
-import("functree/system/Config.func"); // 等同于const Config = import("functree/system/Config.func");
+const Config = import("functree/system/Config.func");
 const Console = import("functree/app/Console.func");
 const print = Console.print;
 

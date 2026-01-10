@@ -1127,16 +1127,16 @@ test "decl access by string" {
 }
  ```
 
-#### 21. Include code file
-Syntax: `include(comptime code_file_path: []const u8);`.  
-This function will retrieve the code file content based on the **string path** of `code_file_path`, directly embed the code into the **functional file**’s code, and share **context variables** and **scope** with other code.  
+#### 21. Include Code File
+Syntax: `include(comptime code_file_path: str);`.  
+This function will retrieve the code file content based on the `code_file_path`, directly embed the code into the **functional file**’s code, and share **context variables** and **scope** with other code.  
 
 For example: The content of the `functree/Config.func` file is as follows:   
  ```
 const string = "Hello, world!\n";
  ```
 
-`functree/System.func`:  
+The content of the `functree/System.func` file is as follows:  
  ```
 const Console = import("functree/system/io/Console.func");
 const print = Console.print;
@@ -1147,7 +1147,7 @@ pub fn main() void {
     print(string);
 }
  ```
-be equal to:  
+Equivalent to:  
  ```
 const Console = import("functree/system/io/Console.func");
 const print = Console.print;
@@ -1160,10 +1160,10 @@ pub fn main() void {
  ```
 
 #### 22. Import Function Unit
-Syntax: `const FuncName = import(comptime func_path: str);` or `import(comptime func_path: []const u8);`.
-This function imports a **function unit file** based on the `func_path` **string**, defaulting the **function unit file name** as the variable name:
+Syntax: `const FuncName = import(comptime func_path: str);`.
+This function imports a **function unit file** based on the `func_path`, the **function unit file name** should be used as the variable name, their names start with an uppercase letter (**TitleCase**):
  ```
-import("functree/system/Config.func"); // Equivalent to const Config = import("functree/system/Config.func");
+const Config = import("functree/system/Config.func");
 const Console = import("functree/app/Console.func");
 const print = Console.print;
 
