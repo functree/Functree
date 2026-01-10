@@ -1127,8 +1127,40 @@ test "decl access by string" {
 }
  ```
 
-#### 21. Import Function Unit
-Syntax: `const FuncName = import(comptime func_path: str) type` or `import(comptime func_path: []const u8) type`.
+#### 21. 包含代码文件(include)
+Syntax: `include(comptime code_file_path: []const u8);`.  
+This function will retrieve the code file content based on the **string path** of `code_file_path`, directly embed the code into the **functional file**’s code, and share **context variables** and **scope** with other code.  
+
+For example: The content of the `functree/Config.func` file is as follows:   
+ ```
+const string = "Hello, world!\n";
+ ```
+
+`functree/System.func`:  
+ ```
+const Console = import("functree/system/io/Console.func");
+const print = Console.print;
+
+include("functree/Config.func");
+
+pub fn main() void {
+    print(string);
+}
+ ```
+be equal to:  
+ ```
+const Console = import("functree/system/io/Console.func");
+const print = Console.print;
+
+const string = "Hello, world!\n";
+
+pub fn main() void {
+    print(string);
+}
+ ```
+
+#### 22. Import Function Unit
+Syntax: `const FuncName = import(comptime func_path: str);` or `import(comptime func_path: []const u8);`.
 This function imports a **function unit file** based on the `func_path` **string**, defaulting the **function unit file name** as the variable name:
  ```
 import("functree/system/Config.func"); // Equivalent to const Config = import("functree/system/Config.func");
@@ -1141,7 +1173,7 @@ pub fn main() void {
 }
  ```
 
-#### 22. Test
+#### 23. Test
 Syntax: `test testname {block}`.
 `testname` can be a string or variable identifier. Code within a `test` block is executed when running `./Functree test path/FuncName.func`:
  ```
@@ -1160,7 +1192,7 @@ fn addOne(number: i32) i32 {
 }
  ```
 
-#### 23. Keywords List
+#### 24. Keywords List
 
 | Keyword | Brief Description |
 |---|---|
@@ -1189,6 +1221,8 @@ fn addOne(number: i32) i32 {
 | if | `if` expression |
 | import | Import other function unit file |
 | in | `for` loop condition expression |
+| include | include code file content |
+| inline | define inline code |
 | isize | Signed platform-dependent integer type |
 | or | Logical OR operator |
 | pub | Identifiers defined with `pub` can be referenced from other **function unit files** |

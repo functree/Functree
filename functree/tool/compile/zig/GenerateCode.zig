@@ -193,6 +193,22 @@ fn generateTargetStatementText(self: *GenerateCode, statement: Statement, level:
             }
             return import_line;
         },
+        .include => {
+            const root_node = statement.getNode(root_node_index);
+            const relative_path = try self.generateExpressionText(statement, root_node.right_side);
+            const include_file_path = relative_path[1 .. relative_path.len - 1];
+            const file = std.fs.cwd().openFile(include_file_path, .{}) catch |err| {
+                std.debug.print("{s}: read file error: {any}\n", .{ include_file_path, err });
+                return err;
+            };
+            defer file.close(); // The file closes before we exit the function which happens before we work with the buffer.
+            const f_len = try file.getEndPos();
+            const buf = try self.allocator.alloc(u8, f_len);
+            errdefer self.allocator.free(buf); // In case an error happens while reading
+
+            _ = try file.readAll(buf);
+            return buf;
+        },
 
         .define_fn => {
             var code_line = prefix_space;

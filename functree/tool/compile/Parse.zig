@@ -235,7 +235,7 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
             continue;
         }
         if (Util.isEql(utf8_char, ",") and self.notInCommentStringLiteral()) {
-            if ((current_statement.code_type == .declare_param) or
+            if ((current_statement.code_type == .declare_param and !current_statement.have_call_fn) or
                 (current_statement.code_type == .switch_case_block and current_statement.token_list.items[current_statement.token_list.items.len - 1].token_type == .l_brace_r_brace))
             {
                 try self.parseTokenFinished(&current_statement);
@@ -391,6 +391,8 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
                     try self.parseTokenFinished(&current_statement);
                     if (current_statement.code_type == .unkown) {
                         current_statement.code_type = .call_fn;
+                    } else if (current_statement.code_type == .declare_param) {
+                        current_statement.have_call_fn = true;
                     }
                     self.parseTokenStart(&current_statement, c);
                 },
@@ -403,6 +405,9 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
                     self.parseTokenStart(&current_statement, c);
                 },
                 else => {
+                    if (c == ')' and current_statement.code_type == .declare_param and current_statement.have_call_fn) {
+                        current_statement.have_call_fn = false;
+                    }
                     try self.parseTokenFinished(&current_statement);
                     self.parseTokenStart(&current_statement, c);
                 },
@@ -1090,6 +1095,9 @@ fn parseTokenFinished(self: *Parse, current_statement: *Statement) Error!void {
                             .keyword_import => {
                                 current_statement.code_type = .import; // code_type = .import
                             },
+                            .keyword_include => {
+                                current_statement.code_type = .include; // code_type = .include
+                            },
                             .keyword_defer => {
                                 current_statement.code_type = ._defer; // code_type = ._defer
                             },
@@ -1181,6 +1189,9 @@ fn parseStatementFinished(self: *Parse, current_statement: *Statement) Error!Nod
         },
         .import => {
             return try self.parseImportStatement(current_statement);
+        },
+        .include => {
+            return try self.parseIncludeStatement(current_statement);
         },
 
         // block,
@@ -2134,7 +2145,12 @@ fn parseImportFuncNode(self: *Parse, current_statement: *Statement) Error!NodeIn
     const func_path = import_path[1 .. import_path.len - 1];
     const func_name = try get_func_name(self.arena, func_path);
     const last_period_pos = std.mem.lastIndexOf(u8, func_name, ".");
-    const func_file_name = func_name[last_period_pos.? + 1 ..];
+    var func_file_name: []const u8 = undefined;
+    if (last_period_pos == null) {
+        func_file_name = func_name;
+    } else {
+        func_file_name = func_name[last_period_pos.? + 1 ..];
+    }
     const first_letter = func_file_name[0];
     if (first_letter < 'A' or first_letter > 'Z') {
         return self.fail(.expected_capitalization_for_container_name, current_statement, self.current_token_index);
@@ -2222,6 +2238,22 @@ fn parseImportStatement(self: *Parse, current_statement: *Statement) !NodeIndex 
     const right_side = try current_statement.appendNode(right_node);
     //main_token is import, `import(rhs)`
     const node = CodeNode.init(import_token_index, .import_func, null_node, right_side);
+    self.incTokenIndex();
+    _ = try self.skipOneToken(current_statement, .r_paren);
+    return try current_statement.appendRootNode(node);
+}
+fn parseIncludeStatement(self: *Parse, current_statement: *Statement) !NodeIndex {
+    self.current_token_index = 0;
+    const include_token_index = self.current_token_index;
+    self.incTokenIndex();
+    _ = try self.skipOneToken(current_statement, .l_paren);
+
+    //right_node's main_token is "string"
+    const right_node = CodeNode.init(self.current_token_index, .string_literal, null_node, null_node);
+    const right_side = try current_statement.appendNode(right_node);
+
+    //main_token is include, `include(rhs)`
+    const node = CodeNode.init(include_token_index, .include_func, null_node, right_side);
     self.incTokenIndex();
     _ = try self.skipOneToken(current_statement, .r_paren);
     return try current_statement.appendRootNode(node);

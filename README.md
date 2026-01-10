@@ -1128,8 +1128,40 @@ test "decl access by string" {
 }
  ```
 
-#### 21. 引入功件(import)
-语法：`const FuncName = import(comptime func_path: str) type` 或 `import(comptime func_path: []const u8) type`。
+#### 21. 包含代码文件(include)
+语法：`include(comptime code_file_path: []const u8);`。
+这个功能将根据 `code_file_path` 路径**字符串**获取代码文件内容，将代码直接嵌入到**功件文件**的代码中，并与其他代码共享上下文**变量**和**作用域**。
+
+例如，`functree/Config.func`文件内容如下：
+ ```
+const string = "Hello, world!\n";
+ ```
+
+`functree/System.func`文件内容：
+ ```
+const Console = import("functree/system/io/Console.func");
+const print = Console.print;
+
+include("functree/Config.func");
+
+pub fn main() void {
+    print(string);
+}
+ ```
+相当于：
+ ```
+const Console = import("functree/system/io/Console.func");
+const print = Console.print;
+
+const string = "Hello, world!\n";
+
+pub fn main() void {
+    print(string);
+}
+ ```
+
+#### 22. 引入功件(import)
+语法：`const FuncName = import(comptime func_path: str);` 或 `import(comptime func_path: []const u8);`。
 这个功能将根据 `func_path` 路径**字符串**引入**功件文件**，默认将**功件文件名称**作为变量名称：
  ```
 import("functree/system/Config.func"); // 等同于const Config = import("functree/system/Config.func");
@@ -1142,7 +1174,7 @@ pub fn main() void {
 }
  ```
 
-#### 22. 测试(test)
+#### 23. 测试(test)
 语法：`test testname {block}`。
 `testname` 可以字符串或变量标识符，包含在 `test` 块中的代码，将在 `./Functree test path/FuncName.func` 时执行测试：
  ```
@@ -1161,7 +1193,7 @@ fn addOne(number: i32) i32 {
 }
  ```
 
-#### 23. 关键字(Keyword)列表
+#### 24. 关键字(Keyword)列表
 
 |关键字|简要说明|
 |---|---|
@@ -1190,6 +1222,8 @@ fn addOne(number: i32) i32 {
 |if | `if` 表达式 |
 |import | 引入其他功件文件 |
 |in | `for` 循环条件表达式 |
+|include | 包含代码文件 |
+|inline | 定义内联代码 |
 |isize | 有符号平台相关整数类型 |
 |or | 逻辑或运算符 |
 |pub | 可以从其它**功件文件**引用 `pub` 定义的标识符号 |

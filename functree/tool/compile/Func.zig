@@ -88,6 +88,7 @@ pub const Statement = struct {
     is_container: bool = false,
     is_fn: bool = false,
     have_const_var: bool = false,
+    have_call_fn: bool = false,
     name: Str,
     scope: Str,
     state: StatementState,
@@ -229,6 +230,8 @@ pub const NodeType = enum {
     root,
     /// import("functree/system/Memory.func")
     import_func,
+    /// include("functree/system/Config.func")
+    include_func,
     /// `pub var rhs`, main_token is var or const
     define_var,
     /// `a: rhs`. rhs may be unused.
@@ -427,6 +430,8 @@ pub const CodeType = enum {
     _try,
     /// `import(rhs)`. lhs unused. main_token is 'import'.
     import,
+    /// `include(rhs)`. lhs unused. main_token is 'include'.
+    include,
 
     _block,
     define_fn,
@@ -471,6 +476,7 @@ pub const KeywordMap = std.StaticStringMap(TokenType).initComptime(.{
     .{ "func", .keyword_func },
     .{ "if", .keyword_if },
     .{ "import", .keyword_import },
+    .{ "include", .keyword_include },
     .{ "in", .keyword_in },
     .{ "inline", .keyword_inline },
     // .{ "null", .keyword_null },
@@ -742,6 +748,7 @@ pub const TokenType = enum {
     keyword_if,
     keyword_for,
     keyword_in,
+    keyword_include,
     keyword_inline,
     keyword_import,
     // keyword_null,
