@@ -1127,7 +1127,7 @@ test "decl access by string" {
 }
  ```
 
-#### 21. 包含代码文件(include)
+#### 21. Include code file
 Syntax: `include(comptime code_file_path: []const u8);`.  
 This function will retrieve the code file content based on the **string path** of `code_file_path`, directly embed the code into the **functional file**’s code, and share **context variables** and **scope** with other code.  
 
