@@ -484,10 +484,23 @@ fn generateChildStatementText(self: *GenerateCode, statement: Statement, level: 
 fn generateChildStatementText2(self: *GenerateCode, statement: Statement, level: usize, prefix_space: Str) !Str {
     // std.debug.print("parent_ir_code c = {any}, {any}, {d}\n", .{ code.code_type, code.child_list.items.len, code.line_no });
     var code_line: Str = "";
-    for (statement.child_list.items) |child_statement| {
+    var i: usize = 0;
+    while (i < statement.child_list.items.len) {
+        const child_statement = statement.child_list.items[i];
+        if (i < statement.child_list.items.len - 1) {
+            const next_statement = statement.child_list.items[i + 1];
+            if ((child_statement.code_type == .if_block or child_statement.code_type == .else_block) and next_statement.code_type == .else_block) {
+                try self.if_else_flag_map.?.put(level, true);
+            } else {
+                try self.if_else_flag_map.?.put(level, false);
+            }
+        } else {
+            try self.if_else_flag_map.?.put(level, false);
+        }
         // std.debug.print("generateTargetStatementText child_statement_list=={any}\n", .{child_statement});
         const child_text = try self.generateTargetStatementText(child_statement, level);
         code_line = try Util.concat(self.allocator, &.{ code_line, child_text });
+        i += 1;
     }
     code_line = try Util.concat(self.allocator, &.{ code_line, prefix_space, "},\n" });
     return code_line;
@@ -919,8 +932,12 @@ fn generateArrayTypeSizeText(self: *GenerateCode, statement: Statement, node_ind
     if (this_node.left_side != null_node) {
         const left_node = statement.getNode(this_node.left_side);
         if (left_node.node_type == .slice_sentinel) {
-            const slice_sentinel_text = try self.generateIdentifierText(statement, left_node.right_side);
-            text = try Util.concat(statement.arena, &.{ text, ":", slice_sentinel_text, "]" });
+            var slice_sentinel_left_text: Str = "";
+            if (left_node.left_side != null_node) {
+                slice_sentinel_left_text = try self.generateIdentifierText(statement, left_node.left_side);
+            }
+            const slice_sentinel_right_text = try self.generateIdentifierText(statement, left_node.right_side);
+            text = try Util.concat(statement.arena, &.{ text, slice_sentinel_left_text, ":", slice_sentinel_right_text, "]" });
         } else {
             const array_size_token_text = generateCodeByTokenIndex(statement, left_node.main_token);
             text = try Util.concat(statement.arena, &.{ text, array_size_token_text, "]" });

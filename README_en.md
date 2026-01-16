@@ -207,7 +207,8 @@ const text = '''
  ```
 
 #### 4. Pointer
-**Single-item pointers** point to a single variable. Syntax: `*T`. Dereferencing to access pointed-to content: `ptr.*`. Taking address of variable: `&x`:
+**Single-item pointers** point to a single variable.   
+Syntax: `*T`. Dereferencing to access pointed-to content: `ptr.*`. Taking address of variable: `&x`:
  ```
 test "address of syntax" {
     // Get address of constant. Constant value is read-only, cannot be changed.
@@ -242,7 +243,8 @@ test "pointer array access" {
   - Slice: `ptr[0..1]`;
   - Pointer subtraction: `ptr - ptr`.
 
-**Many-item pointers** point to an unknown number of elements. Syntax: `[*]T`. Accessing an element: `ptr[i]`:
+**Many-item pointers** point to an unknown number of elements.   
+Syntax: `[*]T`. Accessing an element: `ptr[i]`:
  ```
 test "pointer arithmetic with many-item pointer" {
     const array: [4]i32 = [1, 6, 3, 4];
@@ -278,7 +280,7 @@ test "slice syntax" {
  ```
 
 #### 5. Struct
-**Struct** is an **aggregate type** that can carry multiple fields. Built-in functions are not currently supported.
+**Struct** is an **aggregate type** that can carry multiple fields. Built-in functions are not currently supported.  
 Syntax: `struct {field_name1: type1, field_name2: type2, ...}`. Use dot operator to access fields:
  ```
 // Declare a struct. Note: struct name must start with uppercase letter.
@@ -308,7 +310,7 @@ const point2: Point2 = .{
  ```
 
 #### 6. Tuple
-A struct without specified field names is a **tuple**. Built-in functions are not currently supported.
+A struct without specified field names is a **tuple**. Built-in functions are not currently supported.  
 Syntax: `struct {type1, type2, ...}`. Like arrays, use square brackets to access elements, use `.len` to get element count:
 ```
 // Declare a tuple. Note: tuple name must start with uppercase letter.
@@ -341,7 +343,7 @@ _ = mod; // Here mod = 1
  ```
 
 #### 7. Enum
-**Enum** is an **aggregate type** with multiple predefined values. Built-in functions are not currently supported.
+**Enum** is an **aggregate type** with multiple predefined values. Built-in functions are not currently supported.  
 Syntax: `enum {value1, value2, ...}`. Use dot operator to access elements:
  ```
 // Declare an enum. Note: enum name must start with uppercase letter.
@@ -373,7 +375,7 @@ _ = Value2.million; // 1000000
  ```
 
 #### 8. Union
-**Union** is similar to `struct`, can define multiple fields, but only one field value is valid at a time. Built-in functions are not currently supported.
+**Union** is similar to `struct`, can define multiple fields, but only one field value is valid at a time. Built-in functions are not currently supported.  
 Syntax: `union {field_name1: type1, field_name2: type2, ...}`. Use dot operator to access fields:
  ```
 // Declare a union. Note: union name must start with uppercase letter.
@@ -416,7 +418,7 @@ test "switch on tagged union" {
  ```
 
 #### 9. Variable and Assignment
-Variables defined with `const` are actually constants; their values cannot be modified. Variables defined with `var` must be modified or referenced after definition.
+Variables defined with `const` are actually constants; their values cannot be modified. Variables defined with `var` must be modified or referenced after definition.  
 Variables must have a type; typeless variables do not exist. Definition syntax: `const name: type = v;` or `var name: type = v;`. Type and variable name separated by colon `:`:
  ```
 pub fn main() void {
@@ -424,7 +426,7 @@ pub fn main() void {
     y += 1;
 }
  ```
-When defining variables, prefer `const` where possible, as it reduces bugs and aids optimization/maintenance. If a `const` variable is given an initial value at declaration, it is **compile-time known**.
+When defining variables, prefer `const` where possible, as it reduces bugs and aids optimization/maintenance. If a `const` variable is given an initial value at declaration, it is **compile-time known**.  
 Variables must be used after definition. Use `_ = name;` to ignore a variable's use; similarly, `_ = expr;` can ignore the result of expression expr.
  ```
 pub fn main() void {
@@ -449,8 +451,8 @@ pub fn main() void {
 }
  ```
 
-Scope refers to the valid usage region of an **identifier** (including ordinary variables, type definitions, function definitions, etc.) during program execution.
-Typically, the full **lifetime** of a variable includes definition, use, and invalidation. When an **identifier** leaves its **scope**, it becomes invalid and unusable. Within a **scope**, duplicate **identifiers** are not allowed.
+Scope refers to the valid usage region of an **identifier** (including ordinary variables, type definitions, function definitions, etc.) during program execution.  
+Typically, the full **lifetime** of a variable includes definition, use, and invalidation. When an **identifier** leaves its **scope**, it becomes invalid and unusable. Within a **scope**, duplicate **identifiers** are not allowed.  
 
 **Local variables** are variables whose lifetime is only effective within the current function or block:
  ```
@@ -485,7 +487,8 @@ test "comptime pointers" {
 }
  ```
 
-**Static local variables** refer to **aggregate type** variables (struct, enum, etc.) declared within a function or block scope. **Static local variables** have static lifetime, but their scope is **function scope** or **block scope**:
+**Static local variables** refer to **aggregate type** variables (struct, enum, etc.) declared within a function or block scope.   
+**Static local variables** have static lifetime, but their scope is **function scope** or **block scope**:
  ```
 test "static local variable" {
     foo(); // S.x = 1235
@@ -507,7 +510,8 @@ fn foo1() i32 {
 }
  ```
 
-**Container-level variables** are variables declared at the top level of a **function unit file** (which is also a container). They have static lifetime, and their scope is **function unit scope**. If a **container-level variable** is initialized at declaration, its value is **compile-time known**; otherwise, it's **runtime known**:
+**Container-level variables** are variables declared at the top level of a **function unit file** (which is also a container). They have static lifetime, and their scope is **function unit scope**.   
+If a **container-level variable** is initialized at declaration, its value is **compile-time known**; otherwise, it's **runtime known**:
  ```
 var y: i32 = add(10, x);
 const x: i32 = add(12, 34);
@@ -853,7 +857,7 @@ fn deferInvalidExample() !void {
  ```
 
 #### 17. Function
-Syntax: `specifier fn name(varlist) result body`.
+Syntax: `specifier fn name(varlist) result body`.  
 Function consists of name, parameter list varlist, return type result, body, and modifier specifier:
  ```
 fn add(x:i8, y:i8) i8 { // Parameters x, y are "passed by value"
@@ -872,8 +876,8 @@ test "functions" {
 }
  ```
 
-When basic types like integers and floats are passed as function parameters, the function body uses a copy of the parameter value, i.e., "**pass by value**". This typically involves minimal CPU register copying.
-When **aggregate types** like structs, arrays are passed as function parameters, the function body might use a copy of the parameter value or a reference address, i.e., "**pass by reference**", because some **aggregate types** are complex and expensive to copy.
+When basic types like integers and floats are passed as function parameters, the function body uses a copy of the parameter value, i.e., "**pass by value**". This typically involves minimal CPU register copying.  
+When **aggregate types** like structs, arrays are passed as function parameters, the function body might use a copy of the parameter value or a reference address, i.e., "**pass by reference**", because some **aggregate types** are complex and expensive to copy.  
 Thus, when **passing by value** (basic types and some aggregate types), the parameter's value cannot be changed inside the function:
  ```
 fn test1(i: i32) void {
@@ -937,7 +941,7 @@ test "fibonacci" {
  ```
 
 #### 18. Error
-Error-related types include **error set type** and **error union type**, mainly used for error handling in function returns.
+Error-related types include **error set type** and **error union type**, mainly used for error handling in function returns.  
 **Error set type** has syntax similar to **enum type**: `error{err1, err2, ...}`, also uses dot operator to access elements:
  ```
 const FileOpenError = error{
@@ -996,7 +1000,7 @@ test "merge error sets" {
 }
  ```
 
-Using exclamation mark `!` to combine an **error set type** with a normal type yields: **error union type**, indicating a function return value is either a normal type or an **error set type**.
+Using exclamation mark `!` to combine an **error set type** with a normal type yields: **error union type**, indicating a function return value is either a normal type or an **error set type**.  
 Syntax: `errset!T` or `!T`. The **error set type** can be omitted:
  ```
 const ResultError = error{
@@ -1031,8 +1035,8 @@ fn doAThing(string: []u8) void {
     _ = number; // ...
 }
  ```
-In the above function, if `string` is a number, then `number` equals that number; otherwise `number = 13`.
-Attempting to call a function returning an error union: syntax `try a`. If `a` is a normal value, continue execution; if `a` is an error, exit the function body and return the error.
+In the above function, if `string` is a number, then `number` equals that number; otherwise `number = 13`.  
+Attempting to call a function returning an error union: syntax `try a`. If `a` is a normal value, continue execution; if `a` is an error, exit the function body and return the error.  
 If a function body contains `try`, the function's return type must be an **error union type**. If the function doesn't need to return an **error union type**, use `catch` to handle the error:
  ```
 fn doAThing(string: []u8) !void {
@@ -1160,7 +1164,7 @@ pub fn main() void {
  ```
 
 #### 22. Import Function Unit
-Syntax: `const FuncName = import(comptime func_path: str);`.
+Syntax: `const FuncName = import(comptime func_path: str);`.  
 This function imports a **function unit file** based on the `func_path`, the **function unit file name** should be used as the variable name, their names start with an uppercase letter (**TitleCase**):
  ```
 const Config = import("functree/system/Config.func");
@@ -1174,7 +1178,7 @@ pub fn main() void {
  ```
 
 #### 23. Test
-Syntax: `test testname {block}`.
+Syntax: `test testname {block}`.  
 `testname` can be a string or variable identifier. Code within a `test` block is executed when running `./Functree test path/FuncName.func`:
  ```
 code('''const std = @import("std");''');

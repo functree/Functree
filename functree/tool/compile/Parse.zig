@@ -250,7 +250,7 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
             }
         }
         //code_line end, not "ab;cd", not "'''abc'''"
-        if (Util.isEql(utf8_char, ";") and self.notInCommentStringLiteral()) {
+        if (Util.isEql(utf8_char, ";") and self.current_token_state != .char_literal and self.notInCommentStringLiteral()) {
             try self.parseTokenFinished(&current_statement);
             self.current_token.token_type = .semicolon;
             self.current_token.text = ";";
@@ -1505,6 +1505,15 @@ fn parseArrayTypeSizeNode(self: *Parse, current_statement: *Statement) Error!Nod
             self.incTokenIndex();
             const right_node_index = try self.parseExpressionNode(current_statement);
             const node = CodeNode.init(colon_token_index, .slice_sentinel, null_node, right_node_index);
+            left_side = try current_statement.appendNode(node);
+        } else if (self.getNextToken(current_statement).token_type == .colon) { // [n:0]u8
+            const left_node = CodeNode.init(self.current_token_index, .identifier, null_node, null_node);
+            const left_node_index = try current_statement.appendNode(left_node);
+            self.incTokenIndex();
+            const colon_token_index = self.current_token_index;
+            self.incTokenIndex();
+            const right_node_index = try self.parseExpressionNode(current_statement);
+            const node = CodeNode.init(colon_token_index, .slice_sentinel, left_node_index, right_node_index);
             left_side = try current_statement.appendNode(node);
         } else {
             left_side = try self.parseExpressionNode(current_statement);
