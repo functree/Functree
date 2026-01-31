@@ -589,10 +589,8 @@ Operator list:
 | Less Than | `x < y` | Integers, floats | | `(1 < 2) == true` |
 | Less Than or Equal | `x <= y` | Integers, floats | | `(1 <= 2) == true` |
 | Array Concatenation | `x ++ y` | Arrays | Length of all arrays must be ==compile-time== known | `const array1 = [1,2];const array2 = [3,4];const together = array1 ++ array2; // together=[1,2,3,4]` |
-| Array Repeat | `x ** y` | Arrays | Length of array a and value of number b must be **compile-time** known | `const pattern = "ab" ** 3; // pattern="ababab"` |
 | Pointer Dereference | `x.*` | Pointers | | `const x: u32 = 1234;const ptr = &x; // ptr.* == 1234` |
 | Address Of | `&x` | All types | | `const x: u32 = 1234;const ptr = &x; // ptr.* == 1234` |
-| Error Set Merge | `x \|\| y` | Error set types | Merge error sets | `const A = error{One};const B = error{Two}; // (A \|\| B) == error{One, Two}` |
 
 Operator precedence:
  ```

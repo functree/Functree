@@ -246,6 +246,7 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
                 _ = try self.parseStatementFinished(&current_statement);
                 try self.appendCurrentStatement(current_statement, parent_statement);
                 current_statement = self.initCurrentStatement(parent_statement);
+                self.previous_utf8_char = ",";
                 continue;
             }
         }
@@ -272,7 +273,7 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
             continue;
         }
         //code_block start, not "{d}", not `u{0ab1Q}`, not `.{}`, not "'''abc'''"
-        if (Util.isEql(utf8_char, "{") and self.notInCommentStringLiteral() and self.current_token_state != .char_literal_unicode_escape_saw_u) {
+        if (Util.isEql(utf8_char, "{") and self.current_token_state != .char_literal and self.notInCommentStringLiteral() and self.current_token_state != .char_literal_unicode_escape_saw_u) {
             if (self.current_token_state != .period) {
                 // return FuncName{} or = FuncName{}
                 if (current_statement.code_type != CodeType.define_fn and current_statement.token_list.items.len > 0) {
@@ -337,7 +338,7 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
             }
         }
         //code_block end, not `u{0ab1Q}`, not `.{}`
-        if (Util.isEql(utf8_char, "}") and self.notInCommentStringLiteral() and self.current_token_state != .char_literal_unicode_escape) {
+        if (Util.isEql(utf8_char, "}") and self.current_token_state != .char_literal and self.notInCommentStringLiteral() and self.current_token_state != .char_literal_unicode_escape) {
             if (current_statement.state != .period_init_start and current_statement.state != .period_init_start2) {
                 if (current_statement.code_type == .unkown and Util.isEql(self.next_utf8_char, ";")) {
                     self.current_list_index += 1;
@@ -484,6 +485,7 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
             .period => switch (c) {
                 '.' => {
                     self.current_token_state = .period_2;
+                    self.current_token.token_type = .ellipsis2;
                 },
                 '*' => {
                     self.current_token_state = .period_asterisk;
@@ -2038,6 +2040,40 @@ fn parseSwitchCaseBlock(self: *Parse, current_statement: *Statement) Error!NodeI
         .l_brace_r_brace => {
             right_side = try self.parseEmptyBlockNode(current_statement);
         },
+        .keyword_continue => {
+            //main_token is 'continue'
+            const continue_token_index = try self.skipOneToken(current_statement, .keyword_continue);
+            const node2 = CodeNode.init(continue_token_index, ._continue, null_node, null_node);
+            right_side = try current_statement.appendNode(node2);
+        },
+        .keyword_break => {
+            //main_token is 'break'
+            const break_token_index = try self.skipOneToken(current_statement, .keyword_break);
+            const node2 = CodeNode.init(break_token_index, ._break, null_node, null_node);
+            right_side = try current_statement.appendNode(node2);
+        },
+        .keyword_return => {
+            right_side = try self.parseReturnNode(current_statement);
+        },
+        .keyword_try => {
+            right_side = try self.parseTryNode(current_statement);
+        },
+        .identifier => {
+            var is_assign = false;
+            var i = self.current_token_index;
+            while (i < current_statement.token_list.items.len) {
+                const token = current_statement.token_list.items[i];
+                if (token.token_type == .equal) {
+                    is_assign = true;
+                }
+                i += 1;
+            }
+            if (is_assign) {
+                right_side = try self.parseAssignNode(current_statement);
+            } else {
+                right_side = try self.expectIdentifierNode(current_statement);
+            }
+        },
         else => {
             right_side = try self.parseExpressionValueNode(current_statement);
             // std.debug.print("---------------parseSwitchCaseBlock wrong func: {s}, token_type: {any}, line_no={d}, column_no={d}\n", .{ self.current_func.func_path, self.getCurrentToken(current_statement).token_type, self.getCurrentToken(current_statement).line_no, self.getCurrentToken(current_statement).column_no });
@@ -2730,6 +2766,16 @@ fn parseExpressionValueNode(self: *Parse, current_statement: *Statement) Error!N
             const main_token = self.current_token_index;
             self.incTokenIndex();
             const node = CodeNode.init(main_token, .field_access, null_node, try self.expectIdentifierNode(current_statement));
+            node_index = try current_statement.appendNode(node);
+        },
+        .keyword_error => {
+            const error_token = self.current_token_index;
+            const error_node = CodeNode.init(error_token, .identifier, null_node, null_node);
+            const error_node_index = try current_statement.appendNode(error_node);
+            self.incTokenIndex();
+            const main_token = self.current_token_index;
+            self.incTokenIndex();
+            const node = CodeNode.init(main_token, .field_access, error_node_index, try self.expectIdentifierNode(current_statement));
             node_index = try current_statement.appendNode(node);
         },
         .period_l_brace => { // '.{'

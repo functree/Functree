@@ -363,10 +363,27 @@ fn generateTargetStatementText(self: *GenerateCode, statement: Statement, level:
                     .empty_block => {
                         code_line = try Util.concat(self.allocator, &.{ code_line, "{},\n" });
                     },
+                    ._continue => code_line = try Util.concat(self.allocator, &.{ code_line, "continue,\n" }),
+                    ._break => code_line = try Util.concat(self.allocator, &.{ code_line, "break,\n" }),
+                    ._return => {
+                        if (right_side != null_node) {
+                            const right_text = try self.generateExpressionText(statement, right_side);
+                            code_line = try Util.concat(self.allocator, &.{ code_line, right_text, ",\n" });
+                        } else {
+                            code_line = try Util.concat(self.allocator, &.{ code_line, "return,\n" });
+                        }
+                    },
+                    ._try => {
+                        const right_text = try self.generateExpressionText(statement, right_side);
+                        code_line = try Util.concat(self.allocator, &.{ code_line, right_text, ",\n" });
+                    },
+                    .assign => {
+                        const right_text = try self.generateAssignText(statement, right_side);
+                        code_line = try Util.concat(self.allocator, &.{ code_line, right_text, ",\n" });
+                    },
                     else => {
                         const text = try self.generateExpressionText(statement, right_side);
-                        code_line = try Util.concat(self.allocator, &.{ code_line, text });
-                        code_line = try Util.concat(self.allocator, &.{ code_line, ",\n" });
+                        code_line = try Util.concat(self.allocator, &.{ code_line, text, ",\n" });
                     },
                 }
             } else {

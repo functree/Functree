@@ -375,7 +375,7 @@ _ = Value2.million; // 1000000
  ```
 
 #### 8. 联合(union)
-**联合**类似于 `struct`，可以定义多个预设值，但同时只能有一个字段值有效，目前不支持内置函数。  
+**联合**类似于 `struct`，可以定义多个预设值，但同时只能有一个字段值有效。  
 **联合**为**聚合类型**，目前不支持内置函数。  
 语法：`union {field_name1: type1, field_name2: type2, ...}`，使用点操作符访问内部字段：
  ```
@@ -590,10 +590,8 @@ test "global var"{
 | 小于 | `x < y` | 整数、浮点数 |   |  `(1 < 2) == true` |
 | 小于等于 | `x <= y` | 整数、浮点数 |   |  `(1 <= 2) == true` |
 | 数组合并 | `x ++ y` | 数组 | 所有数组的长度必须==编译时==已知  |  `const array1 = [1,2];const array2 = [3,4];const together = array1 ++ array2; // together=[1,2,3,4]` |
-| 数组重复 | `x ** y` | 数组 | 数组a的长度和数字b的值必须**编译时**已知  |  `const pattern = "ab" ** 3; // pattern="ababab"` |
 | 获取指针内容 | `x.*` | 指针 |   |  `const x: u32 = 1234;const ptr = &x; // ptr.* == 1234` |
 | 取地址 | `&x` | 所有类型 |   |  `const x: u32 = 1234;const ptr = &x; // ptr.* == 1234` |
-| 错误合并 | `x \|\| y` | 错误集类型 | 合并错误集 |  `const A = error{One};const B = error{Two}; // (A \|\| B) == error{One, Two}` |
 
 运算符的优先级：
  ```
@@ -601,7 +599,7 @@ test "global var"{
 2  x!y
 3  x{}
 4  !x -x ~x &x ?x
-5  * / % ** ||
+5  * / %
 6  + - ++
 7  << >>
 8  & ^ | catch
