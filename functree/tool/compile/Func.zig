@@ -516,9 +516,11 @@ pub const OperatorMap = std.StaticStringMap(TokenType).initComptime(.{
     .{ "<", .angle_bracket_left },
     .{ "<=", .angle_bracket_left_equal },
     .{ "<<", .angle_bracket_angle_bracket_left },
+    .{ "<<=", .angle_bracket_angle_bracket_left_equal },
     .{ ">", .angle_bracket_right },
     .{ ">=", .angle_bracket_right_equal },
     .{ ">>", .angle_bracket_angle_bracket_right },
+    .{ ">>=", .angle_bracket_angle_bracket_right_equal },
     .{ "~", .tilde },
 
     .{ ":", .colon },
@@ -593,9 +595,11 @@ pub const TokenState = enum {
     plus_equal,
     angle_bracket_left,
     angle_bracket_angle_bracket_left,
+    angle_bracket_angle_bracket_left_equal,
     angle_bracket_left_equal,
     angle_bracket_right,
     angle_bracket_angle_bracket_right,
+    angle_bracket_angle_bracket_right_equal,
     angle_bracket_right_equal,
     period,
     period_2,
@@ -715,12 +719,16 @@ pub const TokenType = enum {
     angle_bracket_left_equal,
     /// "<<"
     angle_bracket_angle_bracket_left,
+    /// "<<="
+    angle_bracket_angle_bracket_left_equal,
     /// ">"
     angle_bracket_right,
     /// ">="
     angle_bracket_right_equal,
     /// ">>"
     angle_bracket_angle_bracket_right,
+    /// ">>="
+    angle_bracket_angle_bracket_right_equal,
     /// "~"
     tilde,
 

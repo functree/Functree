@@ -11,17 +11,17 @@
 ## 运行、测试与编译
  * 目前`Functree.exe`实现的行为包括：`run`、`test`、`build-exe`、`build-lib`、`build-obj`；
  * 因此，进入`Functree`根目录，可执行下列命令，以运行、测试、编译目标功件源文件：  
- `Functree run functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
- `Functree test functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
- `Functree build-exe functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
- `Functree build-lib functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
- `Functree build-obj functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+ `./Functree run functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+ `./Functree test functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+ `./Functree build-exe functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+ `./Functree build-lib functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+ `./Functree build-obj functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
  * 示例：  
  `zig test Functree.zig`  
- `Functree test functree/app/Hello.func`  
- `Functree run functree/app/Hello.func -target x86_64-windows`  
- `Functree build-exe functree/app/Hello.func -target x86_64-windows -O ReleaseFast`  
- `functree_app_Hello.exe`  
+ `./Functree test functree/app/Hello.func`  
+ `./Functree run functree/app/Hello.func -target x86_64-windows`  
+ `./Functree build-exe functree/app/Hello.func -target x86_64-windows -O ReleaseFast`  
+ `./functree_app_Hello.exe`  
 
 ## 规范
 
@@ -570,11 +570,11 @@ test "global var"{
 | 乘 | `x * y` 或 `x *= y` | 整数、浮点数 | 整数运算注意溢出问题  |  `2 * 5 == 10` |
 |  除    | `x / y` 或 `x /= y` | 整数、浮点数 | 整数运算注意溢出和零除问题  |  `10 / 5 == 2` |
 |  取余  | `x % y` 或 `x %= y` | 整数、浮点数 | 整数和浮点数运算都要注意零除问题  |  `10 % 3 == 1` |
-|  左移位  | `x << y` | 整数 | b必须**编译时已知**  |  `0b1 << 8 == 0b100000000` |
-|  右移位  | `x >> y` | 整数 | b必须**编译时已知**  |  `0b1010 >> 1 == 0b101` |
-|  位与    | `x & y` | 整数 |   |  `0b011 & 0b101 == 0b001` |
-|  位或    | `x \| y` | 整数 |   |  `0b010 \| 0b100 == 0b110` |
-|  异或    | `x ^ y` | 整数 |   |  `0b011 ^ 0b101 == 0b110` |
+|  左移位  | `x << y` 或 `x <<= y` | 整数 | y必须**编译时已知**  |  `0b1 << 8 == 0b100000000` |
+|  右移位  | `x >> y` 或 `x >>= y` | 整数 | y必须**编译时已知**  |  `0b1010 >> 1 == 0b101` |
+|  位与    | `x & y` 或 `x &= y` | 整数 |   |  `0b011 & 0b101 == 0b001` |
+|  位或    | `x \| y` 或 `x \|= y` | 整数 |   |  `0b010 \| 0b100 == 0b110` |
+|  异或    | `x ^ y` 或 `x ^= y` | 整数 |   |  `0b011 ^ 0b101 == 0b110` |
 | 取反  | `~x` | 整数 |   |   |
 | 可选类型取值 | `x.?` | 可选类型 | 整数运算注意溢出问题  |  `const value: ?u32 = 5678; // value.? == 5678` |
 | 捕获错误 | `x catch y` 或 `x catch \|err\| y` | 错误联合类型 |   |  `const value: anyerror!u32 = error.Broken;const unwrapped = value catch 1234; // unwrapped == 1234` |
@@ -606,7 +606,7 @@ test "global var"{
 9  == != < > <= >=
 10 and
 11 or
-12 = *= /= %= += -=
+12 = *= /= %= += -= <<= >>= &= ^= |=
  ```
 
 #### 11. 块(Block)

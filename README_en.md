@@ -11,17 +11,17 @@
 ## Running, Testing, and Building
 * The current behaviors implemented by `Functree.exe` include: `run`, `test`, `build-exe`, `build-lib`, `build-obj`.
 * Therefore, from the `Functree` root directory, you can execute the following commands to run, test, or compile target function source files:  
-    `Functree run functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
-    `Functree test functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
-    `Functree build-exe functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
-    `Functree build-lib functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
-    `Functree build-obj functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+    `./Functree run functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+    `./Functree test functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+    `./Functree build-exe functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+    `./Functree build-lib functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
+    `./Functree build-obj functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
 * Examples:  
     `zig test Functree.zig`  
-    `Functree test functree/app/Hello.func`  
-    `Functree run functree/app/Hello.func -target x86_64-windows`  
-    `Functree build-exe functree/app/Hello.func -target x86_64-windows -O ReleaseFast`  
-    `functree_app_Hello.exe`  
+    `./Functree test functree/app/Hello.func`  
+    `./Functree run functree/app/Hello.func -target x86_64-windows`  
+    `./Functree build-exe functree/app/Hello.func -target x86_64-windows -O ReleaseFast`  
+    `./functree_app_Hello.exe`  
 
 ## Specification
 
@@ -569,11 +569,11 @@ Operator list:
 | Multiply | `x * y` or `x *= y` | Integers, floats | Watch for overflow with integers | `2 * 5 == 10` |
 | Divide | `x / y` or `x /= y` | Integers, floats | Watch for overflow and division by zero | `10 / 5 == 2` |
 | Modulo | `x % y` or `x %= y` | Integers, floats | Watch for division by zero for both ints and floats | `10 % 3 == 1` |
-| Left Shift | `x << y` | Integers | b must be **compile-time known** | `0b1 << 8 == 0b100000000` |
-| Right Shift | `x >> y` | Integers | b must be **compile-time known** | `0b1010 >> 1 == 0b101` |
-| Bitwise AND | `x & y` | Integers | | `0b011 & 0b101 == 0b001` |
-| Bitwise OR | `x \| y` | Integers | | `0b010 \| 0b100 == 0b110` |
-| Bitwise XOR | `x ^ y` | Integers | | `0b011 ^ 0b101 == 0b110` |
+| Left Shift | `x << y` 或 `x <<= y` | Integers | y must be **compile-time known** | `0b1 << 8 == 0b100000000` |
+| Right Shift | `x >> y` 或 `x >>= y` | Integers | y must be **compile-time known** | `0b1010 >> 1 == 0b101` |
+| Bitwise AND | `x & y` 或 `x &= y` | Integers | | `0b011 & 0b101 == 0b001` |
+| Bitwise OR | `x \| y` 或 `x \|= y` | Integers | | `0b010 \| 0b100 == 0b110` |
+| Bitwise XOR | `x ^ y` 或 `x ^= y` | Integers | | `0b011 ^ 0b101 == 0b110` |
 | Bitwise NOT | `~x` | Integers | | |
 | Optional Unwrap | `x.?` | Optional types | Watch for overflow with integers | `const value: ?u32 = 5678; // value.? == 5678` |
 | Error Catch | `x catch y` or `x catch \|err\| y` | Error union types | | `const value: anyerror!u32 = error.Broken;const unwrapped = value catch 1234; // unwrapped == 1234` |
@@ -605,7 +605,7 @@ Operator precedence:
 9  == != < > <= >=
 10 and
 11 or
-12 = *= /= %= += -=
+12 = *= /= %= += -= <<= >>= &= ^= |=
  ```
 
 #### 11. Block

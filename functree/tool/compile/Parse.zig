@@ -468,6 +468,16 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
                     self.parseTokenStart(&current_statement, c);
                 },
             },
+            .angle_bracket_angle_bracket_left => switch (c) {
+                '=' => {
+                    self.current_token_state = .angle_bracket_angle_bracket_left_equal;
+                    self.current_token.token_type = .angle_bracket_angle_bracket_left_equal; // <<=
+                },
+                else => {
+                    try self.parseTokenFinished(&current_statement);
+                    self.parseTokenStart(&current_statement, c);
+                },
+            },
             .angle_bracket_right => switch (c) {
                 '>' => {
                     self.current_token_state = .angle_bracket_angle_bracket_right;
@@ -476,6 +486,16 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
                 '=' => {
                     self.current_token_state = .angle_bracket_right_equal;
                     self.current_token.token_type = .angle_bracket_right_equal; // >=
+                },
+                else => {
+                    try self.parseTokenFinished(&current_statement);
+                    self.parseTokenStart(&current_statement, c);
+                },
+            },
+            .angle_bracket_angle_bracket_right => switch (c) {
+                '=' => {
+                    self.current_token_state = .angle_bracket_angle_bracket_right_equal;
+                    self.current_token.token_type = .angle_bracket_angle_bracket_right_equal; // >>=
                 },
                 else => {
                     try self.parseTokenFinished(&current_statement);
@@ -636,7 +656,7 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
                     self.parseTokenStart(&current_statement, c);
                 },
             },
-            .question_mark, .l_bracket, .r_bracket, .comma, .r_paren, .plus_plus, .plus_equal, .minus_equal, .asterisk_asterisk, .asterisk_equal, .slash_equal, .percent_equal, .caret_equal, .ampersand_equal, .pipe_equal, .pipe_pipe, .bang_equal, .equal_equal, .tilde, .angle_bracket_angle_bracket_left, .angle_bracket_left_equal, .angle_bracket_angle_bracket_right, .angle_bracket_right_equal => {
+            .question_mark, .l_bracket, .r_bracket, .comma, .r_paren, .plus_plus, .plus_equal, .minus_equal, .asterisk_asterisk, .asterisk_equal, .slash_equal, .percent_equal, .caret_equal, .ampersand_equal, .pipe_equal, .pipe_pipe, .bang_equal, .equal_equal, .tilde, .angle_bracket_angle_bracket_left_equal, .angle_bracket_left_equal, .angle_bracket_angle_bracket_right_equal, .angle_bracket_right_equal => {
                 try self.parseTokenFinished(&current_statement);
                 self.parseTokenStart(&current_statement, c);
             },
@@ -1121,7 +1141,7 @@ fn parseTokenFinished(self: *Parse, current_statement: *Statement) Error!void {
                     }
                 }
             },
-            .equal, .plus_equal, .minus_equal, .asterisk_equal, .slash_equal, .percent_equal, .ampersand_equal, .caret_equal, .pipe_equal => {
+            .equal, .plus_equal, .minus_equal, .asterisk_equal, .slash_equal, .percent_equal, .ampersand_equal, .caret_equal, .pipe_equal, .angle_bracket_angle_bracket_left_equal, .angle_bracket_angle_bracket_right_equal => {
                 if (current_statement.code_type == .unkown) {
                     current_statement.code_type = .assign;
                 }
