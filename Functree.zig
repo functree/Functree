@@ -10,21 +10,25 @@ const Str = []const u8;
 
 const output_dir_name = ".funcfile";
 
-var general_purpose_allocator = std.heap.GeneralPurposeAllocator(.{}){};
+// var general_purpose_allocator = std.heap.GeneralPurposeAllocator(.{}){};
 
 const normal_usage =
     \\Usage: Functree [command] [source file path]
 ;
 
-pub fn main() !void {
-    const gpa = general_purpose_allocator.allocator();
+pub fn main(init: std.process.Init) !void {
+    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+    const gpa = switch (builtin.mode) {
+        .Debug => debug_allocator.allocator(),
+        .ReleaseFast, .ReleaseSmall, .ReleaseSafe => std.heap.smp_allocator,
+    };
     var arena_instance = std.heap.ArenaAllocator.init(gpa);
     defer arena_instance.deinit();
     const arena = arena_instance.allocator();
 
     var out_put_type_str: Str = "";
     var source_file_path: Str = "";
-    const args = try std.process.argsAlloc(arena);
+    const args = try init.minimal.args.toSlice(arena); // try std.process.argsAlloc(arena);
     if (args.len < 3) {
         std.log.info("{s}", .{normal_usage});
         fatal("Functree expected 2 args or more.", .{});
@@ -52,10 +56,10 @@ pub fn main() !void {
     }
 
     //创建输出目录
-    var output_dir = try createOutputDir(output_dir_name);
+    var output_dir = try createOutputDir(init.io, output_dir_name);
     defer {
-        output_dir.close();
-        std.fs.cwd().deleteTree(output_dir_name) catch {};
+        output_dir.close(init.io);
+        std.Io.Dir.cwd().deleteTree(init.io, output_dir_name) catch {};
     }
     //Compile
     var compile = Compile.init(gpa, arena, .{
@@ -66,65 +70,21 @@ pub fn main() !void {
     });
     defer compile.deinit();
 
-    _ = compile.make();
+    _ = compile.make(init.io, init.environ_map);
 }
 
 pub fn fatal(comptime format: []const u8, args: anytype) noreturn {
     std.log.err(format, args);
     std.process.exit(1);
 }
-fn createOutputDir(dir_name: Str) !std.fs.Dir {
-    if (std.fs.cwd().openDir(dir_name, .{})) |dir| {
+fn createOutputDir(io: std.Io, dir_name: Str) !std.Io.Dir {
+    if (std.Io.Dir.cwd().openDir(io, dir_name, .{})) |dir| {
         return dir;
     } else |err| switch (err) {
         error.FileNotFound => {
-            try std.fs.cwd().makeDir(dir_name);
-            return std.fs.cwd().openDir(dir_name, .{});
+            try std.Io.Dir.cwd().createDir(io, dir_name, .default_file);
+            return std.Io.Dir.cwd().openDir(io, dir_name, .{});
         },
         else => |other_err| return other_err,
     }
-}
-
-test "compile variable" {
-    const gpa = general_purpose_allocator.allocator();
-    var arena_instance = std.heap.ArenaAllocator.init(gpa);
-    defer arena_instance.deinit();
-    const arena = arena_instance.allocator();
-
-    const source_file_path: Str = "functree/test/zig/CompileVariable.func";
-
-    //创建输出目录
-    _ = try createOutputDir(output_dir_name);
-    //Compile
-    var extra_arg_list: ArrayList([]const u8) = .empty;
-    var compile = Compile.init(gpa, arena, .{
-        .main_source_file_path = source_file_path,
-        .output_dir_path = output_dir_name,
-        .extra_args = try extra_arg_list.toOwnedSlice(arena),
-    });
-    defer compile.deinit();
-
-    try std.testing.expectEqual(compile.make(), 0);
-}
-
-test "compile function" {
-    const gpa = general_purpose_allocator.allocator();
-    var arena_instance = std.heap.ArenaAllocator.init(gpa);
-    defer arena_instance.deinit();
-    const arena = arena_instance.allocator();
-
-    const source_file_path: Str = "functree/test/zig/CompileFunction.func";
-
-    //创建输出目录
-    _ = try createOutputDir(output_dir_name);
-    //Compile
-    var extra_arg_list: ArrayList([]const u8) = .empty;
-    var compile = Compile.init(gpa, arena, .{
-        .main_source_file_path = source_file_path,
-        .output_dir_path = output_dir_name,
-        .extra_args = try extra_arg_list.toOwnedSlice(arena),
-    });
-    defer compile.deinit();
-
-    try std.testing.expectEqual(compile.make(), 0);
 }

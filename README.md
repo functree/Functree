@@ -4,7 +4,7 @@
 
 ## 安装
 
- * 安装zig环境，zig的目前版本为0.15.2；
+ * 安装zig环境，zig的目前版本为0.16.0；
  * 克隆或下载项目到本地；
  * 进入`Functree`根目录，生成`Functree.exe`可执行文件：zig build-exe Functree.zig
 

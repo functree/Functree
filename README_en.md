@@ -4,7 +4,7 @@
 
 ## Installation
 
-* Install the Zig environment; the current Zig version is 0.15.2.
+* Install the Zig environment; the current Zig version is 0.16.0.
 * Clone or download the project locally.
 * Navigate to the `Functree` root directory and generate the `Functree.exe` executable: `zig build-exe Functree.zig`
 

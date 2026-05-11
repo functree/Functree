@@ -30,7 +30,7 @@ const Str = []const u8;
 
 pub const root_node_index: NodeIndex = 0;
 pub const null_node: NodeIndex = 0;
-pub const Error = error{ParseError} || Allocator.Error || std.fs.Dir.OpenError;
+pub const Error = error{ParseError} || Allocator.Error || std.Io.Dir.OpenError;
 
 /// General-purpose allocator. Used for both temporary and long-term storage.
 gpa: Allocator,
@@ -73,9 +73,9 @@ pub fn deinit(self: *Parse) void {
     self.* = undefined;
 }
 
-pub fn parseFuncSourceCode(self: *Parse, func_path: Str) !Func {
+pub fn parseFuncSourceCode(self: *Parse, io: std.Io, func_path: Str) !Func {
     const func_name = try Parse.get_func_name(self.arena, func_path);
-    const source_code_buffer = try readFileToBuffer(self.gpa, func_path);
+    const source_code_buffer = try readFileToBuffer(self.gpa, io, func_path);
     defer self.gpa.free(source_code_buffer);
     self.current_func = Func.init(self.arena, func_name, func_path);
 
@@ -91,7 +91,7 @@ pub fn parseFuncSourceCode(self: *Parse, func_path: Str) !Func {
     while (source_code_iterator.nextCodepointSlice()) |string| {
         try list.append(self.gpa, try self.gpa.dupe(u8, string));
     }
-    try self.parseStatementAndToken(list, null);
+    try self.parseStatementAndToken(io, list, null);
 
     return self.current_func;
 }
@@ -102,20 +102,20 @@ pub fn get_func_name(arena: Allocator, func_path: Str) !Str {
     std.mem.replaceScalar(u8, func_name, '\\', '.');
     return func_name;
 }
-fn readFileToBuffer(gpa: Allocator, func_file_path: Str) ![]u8 {
-    const f = std.fs.cwd().openFile(func_file_path, .{}) catch |err| {
+fn readFileToBuffer(gpa: Allocator, io: std.Io, func_file_path: Str) ![]u8 {
+    const f = std.Io.Dir.cwd().openFile(io, func_file_path, .{}) catch |err| {
         std.debug.print("{s}: read file error: {any}\n", .{ func_file_path, err });
         return err;
     };
-    defer f.close(); // The file closes before we exit the function which happens before we work with the buffer.
+    defer f.close(io); // The file closes before we exit the function which happens before we work with the buffer.
 
-    const f_len = try f.getEndPos();
+    const f_len = try f.length(io);
     const buf = try gpa.alloc(u8, f_len);
     errdefer gpa.free(buf); // In case an error happens while reading
 
-    _ = try f.readAll(buf);
-    // const read_bytes = try f.readAll(buf);
-    // std.debug.print("Read {} bytes\n", .{read_bytes});
+    var reader = f.reader(io, buf); // const cwd = std.Io.Dir.cwd().readFile(io, "example.txt", buffer);
+    _ = try reader.interface.readSliceShort(buf);
+    //_ = try f.readAll(buf);
     return buf;
 }
 fn currentStatementIsNotLegal(current_statement: *Statement) bool {
@@ -156,7 +156,7 @@ fn notInCommentStringLiteral(self: *Parse) bool {
 fn statementNotFinished(self: *Parse) bool {
     return !Util.isEql(self.previous_utf8_char, ";") and !Util.isEql(self.previous_utf8_char, "{") and !Util.isEql(self.previous_utf8_char, "}");
 }
-fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statement: ?*Statement) !void {
+fn parseStatementAndToken(self: *Parse, io: std.Io, list: std.ArrayList([]u8), parent_statement: ?*Statement) !void {
     var seen_escape_digits: usize = undefined;
 
     const line_no = if (parent_statement == null) self.current_line_no else self.current_line_no + 1;
@@ -201,7 +201,7 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
                     }
                     if (current_statement.code_type == .switch_case_block and Util.isEql(self.previous_utf8_char, ",")) {
                         // std.debug.print(">>>>>>>>>>>{s}  {any}  {any}\n", .{ self.current_token.text, self.current_token.token_type, current_statement.code_type });
-                        _ = try self.parseStatementFinished(&current_statement);
+                        _ = try self.parseStatementFinished(io, &current_statement);
                         try self.appendCurrentStatement(current_statement, parent_statement);
                         current_statement = self.initCurrentStatement(parent_statement);
                     }
@@ -243,7 +243,7 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
                 self.current_token.text = ",";
                 self.current_token.column_no = self.current_column_no;
                 try current_statement.appendTokenList(self.current_token);
-                _ = try self.parseStatementFinished(&current_statement);
+                _ = try self.parseStatementFinished(io, &current_statement);
                 try self.appendCurrentStatement(current_statement, parent_statement);
                 current_statement = self.initCurrentStatement(parent_statement);
                 self.previous_utf8_char = ",";
@@ -265,7 +265,7 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
                 std.debug.print(">>>>>>>>>>>>>>>>>CodeType.invalid--{any}\n", .{current_statement.code_type});
                 return self.fail(.invalid_code_type, &current_statement, self.current_token_index);
             } else {
-                _ = try self.parseStatementFinished(&current_statement);
+                _ = try self.parseStatementFinished(io, &current_statement);
                 try self.appendCurrentStatement(current_statement, parent_statement);
                 current_statement = self.initCurrentStatement(parent_statement);
             }
@@ -308,9 +308,9 @@ fn parseStatementAndToken(self: *Parse, list: std.ArrayList([]u8), parent_statem
                     } else if (current_statement.code_type == CodeType.invalid) {
                         return self.fail(.invalid_code_type, &current_statement, self.current_token_index);
                     }
-                    _ = try self.parseStatementFinished(&current_statement);
+                    _ = try self.parseStatementFinished(io, &current_statement);
                     self.previous_utf8_char = "{";
-                    try self.parseStatementAndToken(list, &current_statement);
+                    try self.parseStatementAndToken(io, list, &current_statement);
                     try self.appendCurrentStatement(current_statement, parent_statement);
                     // std.debug.print("_block current_statement child_list = {d}\n", .{current_statement.line_no});
                     if (Util.isEql(self.previous_utf8_char, "}")) {
@@ -1055,88 +1055,92 @@ fn parseTokenFinished(self: *Parse, current_statement: *Statement) Error!void {
     if (self.current_token.token_type != .unkown) {
         switch (self.current_token.token_type) {
             .identifier => {
-                const token_type = KeywordMap.get(self.current_token.text);
-                if (token_type != null) {
-                    self.current_token.token_type = token_type.?;
-                    if (self.current_token.token_type == .keyword_fn) {
-                        current_statement.is_fn = true; // const ty = fn (numerator: u32, denominator: u32) struct { u32, u32 };
-                    }
-                    if (current_statement.code_type == .unkown) { //code_type is unkown
-                        switch (self.current_token.token_type) {
-                            .keyword_const, .keyword_var => {
-                                current_statement.have_const_var = true;
-                                if (current_statement.token_list.items.len < 2) {
-                                    current_statement.code_type = .define_var; // code_type = .define_var
-                                }
-                            },
-                            .keyword_fn => {
-                                current_statement.code_type = .define_fn; // code_type = .define_fn
-                            },
-                            .keyword_if => {
-                                current_statement.code_type = .if_block; // code_type = .if_block
-                                current_statement.name = try std.fmt.allocPrint(self.arena, "{s}{d}", .{ "if$", self.block_count });
-                            },
-                            .keyword_else => {
-                                current_statement.code_type = .else_block; // code_type = .else_block
-                                current_statement.name = try std.fmt.allocPrint(self.arena, "{s}{d}", .{ "else$", self.block_count });
-                            },
-                            .keyword_for => {
-                                current_statement.code_type = .for_block; // code_type = .for_block
-                                current_statement.name = try std.fmt.allocPrint(self.arena, "{s}{d}", .{ "for$", self.block_count });
-                            },
-                            .keyword_while => {
-                                current_statement.code_type = .while_block; // code_type = .while_block
-                                current_statement.name = try std.fmt.allocPrint(self.arena, "{s}{d}", .{ "while$", self.block_count });
-                            },
-                            .keyword_switch => {
-                                current_statement.code_type = .switch_block; // code_type = .switch_block
-                                current_statement.name = try std.fmt.allocPrint(self.arena, "{s}{d}", .{ "switch$", self.block_count });
-                            },
-                            .keyword_break => {
-                                current_statement.code_type = ._break; // code_type = ._break
-                            },
-                            .keyword_continue => {
-                                current_statement.code_type = ._continue; // code_type = ._continue
-                            },
-                            .keyword_return => {
-                                current_statement.code_type = ._return; // _return = ._return
-                            },
-                            .keyword_asm => {
-                                current_statement.code_type = ._asm; // code_type = ._asm
-                            },
-                            .keyword_code => {
-                                current_statement.code_type = .code; // code_type = .code
-                            },
-                            .keyword_test => {
-                                current_statement.code_type = .test_block; // code_type = .test_block
-                                current_statement.name = try std.fmt.allocPrint(self.arena, "{s}{d}", .{ "test$", self.block_count });
-                            },
-                            .keyword_try => {
-                                current_statement.code_type = ._try; // code_type = ._try
-                            },
-                            .keyword_import => {
-                                current_statement.code_type = .import; // code_type = .import
-                            },
-                            .keyword_include => {
-                                current_statement.code_type = .include; // code_type = .include
-                            },
-                            .keyword_defer => {
-                                current_statement.code_type = ._defer; // code_type = ._defer
-                            },
-                            .keyword_errdefer => {
-                                current_statement.code_type = ._errdefer; // code_type = ._errdefer
-                            },
-                            .keyword_comptime => {
-                                current_statement.code_type = ._comptime; // code_type = ._comptime
-                            },
-                            else => {},
+                const token_count = current_statement.token_list.items.len;
+                // 允许.test或.fn
+                if (token_count == 0 or current_statement.token_list.items[token_count - 1].token_type != .period) {
+                    const token_type = KeywordMap.get(self.current_token.text);
+                    if (token_type != null) {
+                        self.current_token.token_type = token_type.?;
+                        if (self.current_token.token_type == .keyword_fn) {
+                            current_statement.is_fn = true; // const ty = fn (numerator: u32, denominator: u32) struct { u32, u32 };
                         }
-                    } else {
-                        switch (self.current_token.token_type) {
-                            .keyword_enum, .keyword_union, .keyword_func, .keyword_struct, .keyword_error => {
-                                current_statement.is_container = true;
-                            },
-                            else => {},
+                        if (current_statement.code_type == .unkown) { //code_type is unkown
+                            switch (self.current_token.token_type) {
+                                .keyword_const, .keyword_var => {
+                                    current_statement.have_const_var = true;
+                                    if (token_count < 2) {
+                                        current_statement.code_type = .define_var; // code_type = .define_var
+                                    }
+                                },
+                                .keyword_fn => {
+                                    current_statement.code_type = .define_fn; // code_type = .define_fn
+                                },
+                                .keyword_if => {
+                                    current_statement.code_type = .if_block; // code_type = .if_block
+                                    current_statement.name = try std.fmt.allocPrint(self.arena, "{s}{d}", .{ "if$", self.block_count });
+                                },
+                                .keyword_else => {
+                                    current_statement.code_type = .else_block; // code_type = .else_block
+                                    current_statement.name = try std.fmt.allocPrint(self.arena, "{s}{d}", .{ "else$", self.block_count });
+                                },
+                                .keyword_for => {
+                                    current_statement.code_type = .for_block; // code_type = .for_block
+                                    current_statement.name = try std.fmt.allocPrint(self.arena, "{s}{d}", .{ "for$", self.block_count });
+                                },
+                                .keyword_while => {
+                                    current_statement.code_type = .while_block; // code_type = .while_block
+                                    current_statement.name = try std.fmt.allocPrint(self.arena, "{s}{d}", .{ "while$", self.block_count });
+                                },
+                                .keyword_switch => {
+                                    current_statement.code_type = .switch_block; // code_type = .switch_block
+                                    current_statement.name = try std.fmt.allocPrint(self.arena, "{s}{d}", .{ "switch$", self.block_count });
+                                },
+                                .keyword_break => {
+                                    current_statement.code_type = ._break; // code_type = ._break
+                                },
+                                .keyword_continue => {
+                                    current_statement.code_type = ._continue; // code_type = ._continue
+                                },
+                                .keyword_return => {
+                                    current_statement.code_type = ._return; // _return = ._return
+                                },
+                                .keyword_asm => {
+                                    current_statement.code_type = ._asm; // code_type = ._asm
+                                },
+                                .keyword_code => {
+                                    current_statement.code_type = .code; // code_type = .code
+                                },
+                                .keyword_test => {
+                                    current_statement.code_type = .test_block; // code_type = .test_block
+                                    current_statement.name = try std.fmt.allocPrint(self.arena, "{s}{d}", .{ "test$", self.block_count });
+                                },
+                                .keyword_try => {
+                                    current_statement.code_type = ._try; // code_type = ._try
+                                },
+                                .keyword_import => {
+                                    current_statement.code_type = .import; // code_type = .import
+                                },
+                                .keyword_include => {
+                                    current_statement.code_type = .include; // code_type = .include
+                                },
+                                .keyword_defer => {
+                                    current_statement.code_type = ._defer; // code_type = ._defer
+                                },
+                                .keyword_errdefer => {
+                                    current_statement.code_type = ._errdefer; // code_type = ._errdefer
+                                },
+                                .keyword_comptime => {
+                                    current_statement.code_type = ._comptime; // code_type = ._comptime
+                                },
+                                else => {},
+                            }
+                        } else {
+                            switch (self.current_token.token_type) {
+                                .keyword_enum, .keyword_union, .keyword_func, .keyword_struct, .keyword_error => {
+                                    current_statement.is_container = true;
+                                },
+                                else => {},
+                            }
                         }
                     }
                 }
@@ -1169,7 +1173,7 @@ fn getCurrentToken(self: *Parse, current_statement: *Statement) Token {
 fn getNextToken(self: *Parse, current_statement: *Statement) Token {
     return current_statement.token_list.items[self.current_token_index + 1];
 }
-fn parseStatementFinished(self: *Parse, current_statement: *Statement) Error!NodeIndex {
+fn parseStatementFinished(self: *Parse, io: std.Io, current_statement: *Statement) Error!NodeIndex {
     // printFuncStatementTokenList(current_statement);
     // std.debug.print(">>>>>>>>>>>{s}  {any}\n", .{ current_statement.name, current_statement.code_type });
     if (currentStatementIsNotLegal(current_statement)) {
@@ -1210,7 +1214,7 @@ fn parseStatementFinished(self: *Parse, current_statement: *Statement) Error!Nod
             return try self.parseTryStatement(current_statement);
         },
         .import => {
-            return try self.parseImportStatement(current_statement);
+            return try self.parseImportStatement(io, current_statement);
         },
         .include => {
             return try self.parseIncludeStatement(current_statement);
@@ -2229,7 +2233,7 @@ fn parseImportFuncNode(self: *Parse, current_statement: *Statement) Error!NodeIn
     const node = CodeNode.init(import_token_index, .import_func, null_node, right_side);
     return try current_statement.appendNode(node);
 }
-fn parseImportStatement(self: *Parse, current_statement: *Statement) !NodeIndex {
+fn parseImportStatement(self: *Parse, io: std.Io, current_statement: *Statement) !NodeIndex {
     self.current_token_index = 0;
     const import_token_index = self.current_token_index;
     self.incTokenIndex();
@@ -2245,10 +2249,10 @@ fn parseImportStatement(self: *Parse, current_statement: *Statement) !NodeIndex 
         const last_char = func_path[func_path.len - 1 ..];
         if (Util.isEql(last_char, "*")) {
             const func_dir_path = func_path[0 .. func_path.len - 1];
-            var func_dir = try std.fs.cwd().openDir(func_dir_path, .{ .iterate = true });
-            defer func_dir.close();
+            var func_dir = try std.Io.Dir.cwd().openDir(io, func_dir_path, .{ .iterate = true });
+            defer func_dir.close(io);
             var it = func_dir.iterate();
-            while (try it.next()) |entry| {
+            while (try it.next(io)) |entry| {
                 const ext = std.fs.path.extension(entry.name);
                 if (entry.kind == .file and Util.isEql(ext, ".func")) { // std.mem.indexOf(u8, entry.name, ".func") != null) {
                     const entry_name = entry.name;

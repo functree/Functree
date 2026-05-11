@@ -36,11 +36,11 @@ pub fn copyString(self: *Translator, value: Str) ![]u8 {
     return self.allocator.dupe(u8, value);
 }
 
-pub fn generateTargetStatementList(self: *Translator) !ArrayList(TargetStatement) {
+pub fn generateTargetStatementList(self: *Translator, io: std.Io) !ArrayList(TargetStatement) {
     var target_code_list: ArrayList(TargetStatement) = .empty;
 
     // std.debug.print("FuncName=={s}\n", .{self.main_func.name});
-    try GenerateCode.generateTargetStatementList(self.allocator, self.main_func, &target_code_list);
+    try GenerateCode.generateTargetStatementList(self.allocator, io, self.main_func, &target_code_list);
 
     return target_code_list;
 }

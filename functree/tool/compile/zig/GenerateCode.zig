@@ -24,6 +24,7 @@ const null_node = Parse.null_node;
 pub const GenerateCode = @This();
 
 allocator: Allocator,
+io: std.Io,
 func: Func,
 target_statement_list: *ArrayList(TargetStatement),
 prefix_space: Str = "",
@@ -31,9 +32,10 @@ array_type_info: ?ArrayTypeInfo = null,
 array_level: usize = 0,
 if_else_flag_map: ?AutoHashMap(usize, bool) = null,
 
-pub fn init(allocator: Allocator, func: Func, target_statement_list: *ArrayList(TargetStatement)) !GenerateCode {
+pub fn init(allocator: Allocator, io: std.Io, func: Func, target_statement_list: *ArrayList(TargetStatement)) !GenerateCode {
     var self = GenerateCode{
         .allocator = allocator,
+        .io = io,
         .func = func,
         .target_statement_list = target_statement_list,
     };
@@ -197,16 +199,18 @@ fn generateTargetStatementText(self: *GenerateCode, statement: Statement, level:
             const root_node = statement.getNode(root_node_index);
             const relative_path = try self.generateExpressionText(statement, root_node.right_side);
             const include_file_path = relative_path[1 .. relative_path.len - 1];
-            const file = std.fs.cwd().openFile(include_file_path, .{}) catch |err| {
+            const file = std.Io.Dir.cwd().openFile(self.io, include_file_path, .{}) catch |err| {
                 std.debug.print("{s}: read file error: {any}\n", .{ include_file_path, err });
                 return err;
             };
-            defer file.close(); // The file closes before we exit the function which happens before we work with the buffer.
-            const f_len = try file.getEndPos();
+            defer file.close(self.io); // The file closes before we exit the function which happens before we work with the buffer.
+            const f_len = try file.length(self.io);
             const buf = try self.allocator.alloc(u8, f_len);
             errdefer self.allocator.free(buf); // In case an error happens while reading
 
-            _ = try file.readAll(buf);
+            //_ = try file.readAll(buf);
+            var reader = file.reader(self.io, buf);
+            _ = try reader.interface.readSliceShort(buf);
             return buf;
         },
 
