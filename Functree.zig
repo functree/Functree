@@ -1,90 +1,103 @@
-const std = @import("std");
-const Allocator = std.mem.Allocator;
-const StringHashMap = std.StringHashMap;
-const ArrayList = std.ArrayList;
-const builtin = @import("builtin");
+pub const Config = @import("functree/tool/Config.zig");
+
+const System = @import("functree/tool/System.zig");
+const Memory = System.Memory;
+const Process = System.Process;
+const Io = System.Io;
+const Console = Io.Console;
+const DataType = System.DataType;
+const String = DataType.String;
+const StringMap = DataType.StringMap;
+const List = DataType.List;
+const Fs = System.Fs;
+const Dir = Fs.Dir;
 
 const Compile = @import("functree/tool/Compile.zig");
 
-const Str = []const u8;
-
-const output_dir_name = ".funcfile";
-
-// var general_purpose_allocator = std.heap.GeneralPurposeAllocator(.{}){};
-
 const normal_usage =
-    \\Usage: Functree [command] [source file path]
+    \\    Usage: Functree build-exe   [main source file path] [-...]
+    \\           Functree build-lib   [main source file path] [-...]
+    \\           Functree build-obj   [main source file path] [-...]
+    \\           Functree test        [main source file path] [-...]
+    \\           Functree run         [main source file path] [-...]
+    \\           Functree version
+    \\           Functree help
+    \\
 ;
-
-pub fn main(init: std.process.Init) !void {
-    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
-    const gpa = switch (builtin.mode) {
-        .Debug => debug_allocator.allocator(),
-        .ReleaseFast, .ReleaseSmall, .ReleaseSafe => std.heap.smp_allocator,
-    };
-    var arena_instance = std.heap.ArenaAllocator.init(gpa);
-    defer arena_instance.deinit();
-    const arena = arena_instance.allocator();
-
-    var out_put_type_str: Str = "";
-    var source_file_path: Str = "";
-    const args = try init.minimal.args.toSlice(arena); // try std.process.argsAlloc(arena);
-    if (args.len < 3) {
-        std.log.info("{s}", .{normal_usage});
+pub fn main(init: Process.Init) !void {
+    var memory = Memory.a();
+    memory.f();
+    defer memory.d();
+    const args = try init.minimal.args.toSlice(memory.allocator());
+    if (args.len == 1) {
+        Console.print2("{s}", .{normal_usage});
+        return;
+    }
+    const output_type_str = args[1];
+    if (!String.equalStr(output_type_str, "version") and !String.equalStr(output_type_str, "help") and args.len < 3) {
+        Console.print2("{s}\n", .{normal_usage});
         fatal("Functree expected 2 args or more.", .{});
     } else {
-        out_put_type_str = args[1];
-        source_file_path = args[2];
+        const output_type = Config.OutPutTypeMap.get(output_type_str);
+        if (output_type == null) {
+            Console.print2("{s}", .{normal_usage});
+            fatal("only support 7 output type.", .{});
+        }
+        Config.output_type = output_type.?;
+        if (output_type.? == .help) {
+            Console.print2("{s}", .{normal_usage});
+            return;
+        } else if (output_type.? == .version) {
+            Console.print2("{s}", .{Config.version});
+            return;
+        }
+        const main_source_file_path = args[2];
+        if (main_source_file_path.len < 6 or (!String.endWithStr(main_source_file_path[main_source_file_path.len - 5 ..], ".func") and !String.endWithStr(main_source_file_path[main_source_file_path.len - 5 ..], ".f"))) {
+            Console.print2("{s}\n", .{normal_usage});
+            fatal("main source file path is invalid, file's suffix must be `.func`.", .{});
+        }
+        // Functree.func
+        if (!String.equalStr(main_source_file_path, "Functree.func")) {
+            if (!String.startWithStr(main_source_file_path, "functree/")) {
+                fatal("main source file path must begin with 'functree/'.", .{});
+            }
+            const backslash_pos = String.indexOfStr(main_source_file_path, "\\");
+            if (backslash_pos) |_| {
+                fatal("main source file path must be separated by '/'.", .{});
+            }
+        }
+        Config.main_source_file_path = main_source_file_path;
     }
-    const output_type = Compile.OutPutTypeMap.get(out_put_type_str);
-    if (output_type == null) {
-        std.log.info("{s}", .{normal_usage});
-        fatal("only support 5 output type.", .{});
-    }
-    var extra_arg_list: ArrayList([]const u8) = .empty;
+    var extra_arg_list = List.t([]const u8).a(&memory);
     if (args.len > 3) {
         for (args, 0..) |arg, index| {
             if (index >= 3) {
-                try extra_arg_list.append(arena, arg);
+                try extra_arg_list.add(arg);
             }
         }
     }
-
-    if (source_file_path.len < 6 or !std.mem.eql(u8, source_file_path[source_file_path.len - 5 ..], ".func")) {
-        std.log.info("{s}", .{normal_usage});
-        fatal("source file path is invalid, file's suffix must be `.func`.", .{});
+    Config.extra_cmd_args = try extra_arg_list.toArray();
+    var current_dir = try Dir.getCurrentDir(&memory);
+    defer current_dir.d();
+    const absolute_path = try current_dir.getAbsolutePath();
+    const output_tmp_dir_absolute_path = try Fs.joinPath(&memory, &.{ absolute_path, Config.output_tmp_dir_path });
+    if (Dir.existPath(&memory, output_tmp_dir_absolute_path)) {
+        try Dir.deleteAll(&memory, output_tmp_dir_absolute_path);
     }
-
-    //创建输出目录
-    var output_dir = try createOutputDir(init.io, output_dir_name);
+    try Dir.createDirPath(&memory, output_tmp_dir_absolute_path);
+    Config.output_tmp_dir_absolute_path = output_tmp_dir_absolute_path;
+    var compile = try Compile.a(&memory);
     defer {
-        output_dir.close(init.io);
-        std.Io.Dir.cwd().deleteTree(init.io, output_dir_name) catch {};
+        compile.d();
+        if (!Config.reserve_target_code_file and !Config.reserve_token_file and !Config.reserve_code_node_file) {
+            // Dir.deleteAll(&memory, Config.output_tmp_dir_absolute_path) catch {};
+        }
     }
-    //Compile
-    var compile = Compile.init(gpa, arena, .{
-        .main_source_file_path = source_file_path,
-        .output_dir_path = output_dir_name,
-        .output_type = output_type.?,
-        .extra_args = try extra_arg_list.toOwnedSlice(arena),
-    });
-    defer compile.deinit();
-
-    _ = compile.make(init.io, init.environ_map);
+    compile.make(init.environ_map);
 }
-
 pub fn fatal(comptime format: []const u8, args: anytype) noreturn {
-    std.log.err(format, args);
-    std.process.exit(1);
+    Console.print2(format, args);
+    Process.exit(1);
 }
-fn createOutputDir(io: std.Io, dir_name: Str) !std.Io.Dir {
-    if (std.Io.Dir.cwd().openDir(io, dir_name, .{})) |dir| {
-        return dir;
-    } else |err| switch (err) {
-        error.FileNotFound => {
-            try std.Io.Dir.cwd().createDir(io, dir_name, .default_file);
-            return std.Io.Dir.cwd().openDir(io, dir_name, .{});
-        },
-        else => |other_err| return other_err,
-    }
-}
+
+const Functree = @This();

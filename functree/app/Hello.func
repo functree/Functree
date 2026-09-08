@@ -1,6 +1,6 @@
 //!第一个程序
-const Console = import("functree/app/Console.func");
-const Config = import("functree/system/Config.func");
+const Console = import("Console.func");
+const Config = import("../system/Config.func");
 
 ///程序入口
 pub fn main() void {

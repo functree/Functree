@@ -6,10 +6,10 @@
 
 * Install the Zig environment; the current Zig version is 0.16.0.
 * Clone or download the project locally.
-* Navigate to the `Functree` root directory and generate the `Functree.exe` executable: `zig build-exe Functree.zig`
+* Navigate to the `Functree` root directory and generate the `Functree` executable: `zig build-exe Functree.zig`
 
 ## Running, Testing, and Building
-* The current behaviors implemented by `Functree.exe` include: `run`, `test`, `build-exe`, `build-lib`, `build-obj`.
+* The current behaviors implemented by `Functree` include: `run`, `test`, `build-exe`, `build-lib`, `build-obj`.
 * Therefore, from the `Functree` root directory, you can execute the following commands to run, test, or compile target function source files:  
     `./Functree run functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
     `./Functree test functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
@@ -17,11 +17,10 @@
     `./Functree build-lib functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
     `./Functree build-obj functree/app/Hello.func [-target x86_64-linux -O ReleaseSmall...]`  
 * Examples:  
-    `zig test Functree.zig`  
     `./Functree test functree/app/Hello.func`  
     `./Functree run functree/app/Hello.func -target x86_64-windows`  
     `./Functree build-exe functree/app/Hello.func -target x86_64-windows -O ReleaseFast`  
-    `./functree_app_Hello.exe`  
+    `./functree_app_Hello`  
 
 ## Specification
 
