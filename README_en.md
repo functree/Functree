@@ -34,7 +34,7 @@
 
  `First function unit source file functree/app/Hello.func:`
  ```
-const Console = import("functree/app/Console.func");
+const Console = import("Console.func");
 
 pub fn main() void {
     Console.print("Hello, world!\n");
@@ -53,7 +53,7 @@ Hello, world!
 
 Line comments start with `//` and extend to the end of the line, e.g., `//print("Hello?");`
  ```
-const Console = import("functree/app/Console.func");
+const Console = import("Console.func");
 const print = Console.print;
 pub fn main() void {
     //print("Hello?");
@@ -63,7 +63,7 @@ pub fn main() void {
 
 Documentation comment lines start with `///`, e.g., `///Program entry point`
  ```
-const Console = import("functree/app/Console.func");
+const Console = import("Console.func");
 const print = Console.print;
 ///Program entry point
 pub fn main() void {
@@ -75,7 +75,7 @@ pub fn main() void {
 Whole-file comments start with `//!`. File comment lines must be placed at the very beginning of the file, e.g., `//!File description`
  ```
 //!File description
-const Console = import("functree/app/Console.func");
+const Console = import("Console.func");
 const print = Console.print;
 ///Program entry point
 pub fn main() void {
@@ -1139,10 +1139,10 @@ const string = "Hello, world!\n";
 
 The content of the `functree/System.func` file is as follows:  
  ```
-const Console = import("functree/system/io/Console.func");
+const Console = import("system/io/Console.func");
 const print = Console.print;
 
-include("functree/Config.func");
+include("Config.func");
 
 pub fn main() void {
     print(string);
@@ -1150,7 +1150,7 @@ pub fn main() void {
  ```
 Equivalent to:  
  ```
-const Console = import("functree/system/io/Console.func");
+const Console = import("system/io/Console.func");
 const print = Console.print;
 
 const string = "Hello, world!\n";
@@ -1164,8 +1164,8 @@ pub fn main() void {
 Syntax: `const FuncName = import(comptime func_path: str);`.  
 This function imports a **function unit file** based on the `func_path`, the **function unit file name** should be used as the variable name, their names start with an uppercase letter (**TitleCase**):
  ```
-const Config = import("functree/system/Config.func");
-const Console = import("functree/app/Console.func");
+const Config = import("../system/Config.func");
+const Console = import("Console.func");
 const print = Console.print;
 
 pub fn main() void {

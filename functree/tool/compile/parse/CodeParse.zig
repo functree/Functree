@@ -598,18 +598,6 @@ fn parseCallFnNode(self: *CodeParse, func_code: *Code, left_side: NodeIndex) Cod
     return node_index;
 }
 
-fn parseIncludeCode(self: *CodeParse, func_code: *Code) !NodeIndex {
-    const include_token_index = func_code.end_token;
-    func_code.incEndToken();
-    _ = try self.skipOneToken(func_code, .l_paren);
-    const right_node = Node.a(func_code.end_token, .string_literal, null_node_index, null_node_index);
-    const right_side = try appendFuncCodeNode(func_code, right_node);
-    const node = Node.a(include_token_index, .include_func, null_node_index, right_side);
-    func_code.incEndToken();
-    _ = try self.skipOneToken(func_code, .r_paren);
-    return try appendFuncCodeRootNode(func_code, node);
-}
-
 fn expectIdentifierNode(self: *CodeParse, func_code: *Code) CodeError!NodeIndex {
     if (self.getThisToken(func_code).token_type != .identifier) {
         return CodeError.expected_identifier;
@@ -1851,19 +1839,7 @@ fn parseImportFuncNode(self: *CodeParse, func_code: *Code) CodeError!NodeIndex {
     const functree_func_pos = String.indexOfStr(depend_func_path, "Functree.func");
     if (functree_func_pos == null) {
         if (!String.startWithStr(depend_func_path, "functree/")) {
-            var last_slash_pos = String.lastIndexOfStr(self.this_func.func_path, "/");
-            var this_func_dir_path = self.this_func.func_path[0..last_slash_pos.?];
-            // exist '..'
-            var period_2_pos = String.indexOfStr(depend_func_path, "..");
-            if (period_2_pos != null) {
-                while (period_2_pos) |pos| {
-                    last_slash_pos = String.lastIndexOfStr(this_func_dir_path, "/");
-                    this_func_dir_path = this_func_dir_path[0..last_slash_pos.?];
-                    depend_func_path = depend_func_path[pos + 3 ..];
-                    period_2_pos = String.indexOfStr(depend_func_path, "..");
-                }
-            }
-            depend_func_path = String.concatStr(self.memory, &.{ this_func_dir_path, "/", depend_func_path }) catch return CodeError.out_of_memory;
+            depend_func_path = self.getFuncFullPath(depend_func_path) catch return CodeError.out_of_memory;
         }
         depend_func_name = Func.getFuncFullName(self.memory, depend_func_path) catch return CodeError.out_of_memory;
     } else {
@@ -1887,6 +1863,38 @@ fn parseImportFuncNode(self: *CodeParse, func_code: *Code) CodeError!NodeIndex {
     _ = try self.skipOneToken(func_code, .r_paren);
     const node = Node.a(import_token_index, .import_func, null_node_index, right_side);
     return try appendFuncCodeNode(func_code, node);
+}
+fn parseIncludeCode(self: *CodeParse, func_code: *Code) !NodeIndex {
+    const include_token_index = func_code.end_token;
+    func_code.incEndToken();
+    _ = try self.skipOneToken(func_code, .l_paren);
+
+    var include_path = self.getThisToken(func_code).text;
+    include_path = include_path[1 .. include_path.len - 1];
+    const include_func_path = self.getFuncFullPath(include_path) catch return CodeError.out_of_memory;
+    const include_func_name = Func.getFuncFullName(self.memory, include_func_path) catch return CodeError.out_of_memory;
+    const depend_func = DependFunc.a(DependType.func_source, include_func_name, include_func_path, include_path);
+    self.this_func.appendDependList(depend_func) catch return CodeError.out_of_memory;
+
+    const right_node = Node.a(func_code.end_token, .string_literal, null_node_index, null_node_index);
+    const right_side = try appendFuncCodeNode(func_code, right_node);
+    const node = Node.a(include_token_index, .include_func, null_node_index, right_side);
+    func_code.incEndToken();
+    _ = try self.skipOneToken(func_code, .r_paren);
+    return try appendFuncCodeRootNode(func_code, node);
+}
+fn getFuncFullPath(self: *CodeParse, import_or_include_path: []const u8) ![]const u8 {
+    var last_slash_pos = String.lastIndexOfStr(self.this_func.func_path, "/");
+    var this_func_dir_path = self.this_func.func_path[0..last_slash_pos.?];
+    var relative_path = try String.copyStr(self.memory, import_or_include_path);
+    var period_2_pos = String.indexOfStr(relative_path, "..");
+    while (period_2_pos) |pos| {
+        last_slash_pos = String.lastIndexOfStr(this_func_dir_path, "/");
+        this_func_dir_path = this_func_dir_path[0..last_slash_pos.?];
+        relative_path = relative_path[pos + 3 ..];
+        period_2_pos = String.indexOfStr(relative_path, "..");
+    }
+    return try String.concatStr(self.memory, &.{ this_func_dir_path, "/", relative_path });
 }
 
 fn parseForBlock(self: *CodeParse, func_code: *Code) CodeError!NodeIndex {

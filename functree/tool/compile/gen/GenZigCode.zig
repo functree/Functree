@@ -146,10 +146,17 @@ fn genTargetCodeText(self: *GenZigCode, source_code: Code, level: usize) anyerro
         },
         ._include => {
             const root_node = try source_code.getNode(root_node_index);
-            const relative_path = try self.generateExpressionText(source_code, root_node.right_side);
-            const include_file_path = relative_path[1 .. relative_path.len - 1];
-            var file = File.open(self.memory, include_file_path) catch |err| {
-                Console.print2("{s}: read file error: {any}\n", .{ include_file_path, err });
+            var relative_path = try self.generateExpressionText(source_code, root_node.right_side);
+            relative_path = relative_path[1 .. relative_path.len - 1];
+            for (self.this_func.depend_func_list.values()) |depend_func| {
+                if (String.equalStr(depend_func.import_path, relative_path)) {
+                    relative_path = depend_func.func_path;
+                    break;
+                }
+            }
+
+            var file = File.open(self.memory, relative_path) catch |err| {
+                Console.print2("{s}: read file error: {any}\n", .{ relative_path, err });
                 return GenError.open_include_file_fail;
             };
             defer file.d();
