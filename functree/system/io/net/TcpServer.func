@@ -1,0 +1,59 @@
+const Mem = import("../../Mem.func");
+const Net = import("../Net.func");
+const Console = import("../Console.func");
+const String = import("../../datatype/String.func");
+
+code(
+'''
+const std = @import("std");
+
+pub const Stream = Net.Stream;
+pub const Reader = Stream.Reader;
+pub const Writer = Stream.Writer;
+pub const ListenOptions = Net.IpAddress.ListenOptions;
+'''
+);
+
+mem: *Mem,
+io: std.Io,
+server: std.Io.net.Server,
+stream: ?Stream = null,
+
+pub fn a(mem: *Mem, ip: str, port: u16, options: ListenOptions) !TcpServer {
+    const io = mem.io();
+    const host = try Net.IpAddress.parse(ip, port);
+    const server = try host.listen(io, options);
+
+    return TcpServer{.mem=mem, .io=io, .server=server};
+}
+/// TcpServer will be freed by caller.
+pub fn d(self: *TcpServer) void {
+    if (self.stream != null) {
+        self.stream.?.close(self.io);
+    }
+    self.server.deinit(self.io);
+    self.* = undefined;
+}
+
+pub fn accept(self: *TcpServer) !void {
+    if (self.stream != null) {
+        self.stream.?.close(self.io);
+        self.stream = null;
+    }
+    const stream = try self.server.accept(self.io);
+    self.stream = stream;
+}
+
+pub fn receive(self: *TcpServer) !str {
+    var read_buffer: [1024]u8 = undefined;
+    var reader = self.stream.?.reader(self.io, &read_buffer);
+    const response = try reader.interface.takeDelimiterInclusive('\n');
+    return try String.copyStr(self.mem, String.trimStr(response));
+}
+
+pub fn send(self: *TcpServer, message: str) !void {
+    var write_buffer: [1024]u8 = undefined;
+    var writer = self.stream.?.writer(self.io, &write_buffer);
+    try writer.interface.writeAll(message);
+    try writer.interface.flush();
+}

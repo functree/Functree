@@ -1,0 +1,229 @@
+const Mem = import("../../Mem.func");
+const String = import("../../datatype/String.func");
+
+const Fs = import("../Fs.func");
+const File = Fs.File;
+
+code(
+'''
+const std = @import("std");
+const builtin = @import("builtin");
+
+const TmpDir = std.testing.TmpDir;
+
+pub const MakeDirError = std.Io.Dir.MakeError;
+pub const OpenDirError = std.Io.Dir.OpenError;
+pub const OpenFileOptions = std.Io.Dir.OpenFileOptions;
+pub const CopyFileOptions = std.Io.Dir.CopyFileOptions;
+pub const CopyFileError = std.Io.Dir.CopyFileError;
+pub const Entry = std.Io.Dir.Entry;
+
+const native_os = builtin.os.tag;
+const posix = std.posix;
+const windows = std.os.windows;
+'''
+);
+
+pub const OpenOptions = std.Io.Dir.OpenOptions;
+pub const Iterator = std.Io.Dir.Iterator;
+
+dir: std.Io.Dir,
+mem: *Mem,
+io: std.Io,
+
+/// get a Dir with absolute path, if not exist will create it
+pub fn a(mem: *Mem, absolute_path: str) !Dir {
+    const io = mem.io();
+    return a2(mem, absolute_path, io);
+}
+/// get a Dir with absolute path with options, if not exist will create it
+pub fn a2(mem: *Mem, absolute_path: str, io: std.Io) !Dir {
+    var dir = std.Io.Dir.openDirAbsolute(io, absolute_path, .{.iterate = true}) catch null;
+    if (dir == null) {
+        try createDirPath(mem, absolute_path);
+        dir = try std.Io.Dir.openDirAbsolute(io, absolute_path, .{.iterate = true});
+    }
+    return Dir{.dir=dir.?, .mem=mem, .io=io};
+}
+/// deinit a Dir
+pub fn d(self: *Dir) void {
+    self.dir.close(self.io);
+    self.* = undefined;
+}
+
+/// exist the sub dir or file, will return true
+pub fn exist(self: Dir, sub_path: str) bool {
+    self.dir.access(self.io, sub_path, .{}) catch return false;
+    return true;
+}
+/// Creates parent directories with default permissions as necessary to ensure `sub_path` exists as a directory.
+pub fn createDir(self: *Dir, sub_path: str) !void {
+    try self.dir.createDirPath(self.io, sub_path);
+}
+/// returns `error.DirNotEmpty` if the sub directory is not empty.
+pub fn deleteDir(self: *Dir, sub_path: str) !void {
+    try self.dir.deleteDir(self.io, sub_path);
+}
+/// this function recursively removes its entries and then tries again. even it is a non-empty directory.
+pub fn deleteDirAll(self: *Dir, sub_path: str) !void {
+    try self.dir.deleteTree(self.io, sub_path);
+}
+/// open a sub dir
+pub fn openDir(self: *Dir, sub_path: str) OpenDirError!Dir {
+    const dir = try self.dir.openDir(self.io, sub_path, .{.iterate = true});
+    return Dir{.dir=dir, .mem=self.mem, .io=self.io};
+}
+/// open a sub dir with options
+pub fn openDir2(self: *Dir, sub_path: str, options: OpenOptions) OpenDirError!Dir {
+    const dir = try self.dir.openDir(self.io, sub_path, options);
+    return Dir{.dir=dir, .mem=self.mem, .io=self.io};
+}
+/// get absolute path of this dir
+pub fn getAbsolutePath(self: Dir) ![]u8 {
+    var buffer: [1024]u8 = undefined;
+    const len = try self.dir.realPath(self.io, &buffer);
+    const absolute_path = buffer[0..len];
+    return String.copyStr(self.mem, absolute_path);
+}
+/// read all sub dirs and files with iterator in this dir
+pub fn iter(self: Dir) Iterator {
+    return self.dir.iterate();
+}
+
+/// create a file in this dir
+pub fn createFile(self: *Dir, sub_path: str) !File {
+    return try self.createFile2(sub_path, .{.read = true, .truncate = true});
+}
+/// create a file in this dir
+pub fn createFile2(self: *Dir, sub_path: str, flags: File.CreateFlags) !File {
+    const file = try self.dir.createFile(self.io, sub_path, flags);
+
+    return File{.file=file, .mem=self.mem, .io=self.io};
+}
+/// open a file in this dir
+pub fn openFile(self: *Dir, sub_path: str) !File {
+    const file = try self.dir.openFile(self.io, sub_path, .{.mode = .read_write});
+
+    return File{.file=file, .mem=self.mem, .io=self.io};
+}
+pub fn openFile2(self: *Dir, sub_path: str, options: OpenFileOptions) !File {
+    const file = try self.dir.openFile(self.io, sub_path, options);
+
+    return File{.file=file, .mem=self.mem, .io=self.io};
+}
+/// Read all of file contents using a preallocated buffer.
+pub fn readFile(self: *Dir, sub_path: str, buffer: []u8) ![]u8 {
+    return try self.dir.readFile(sub_path, buffer);
+}
+/// delete a file in  this dir
+pub fn deleteFile(self: *Dir, sub_path: str) !void {
+    return try self.dir.deleteFile(self.io, sub_path);
+}
+
+/// get current dir's absolute path
+pub fn getCurrentDir(mem: *Mem) !Dir {
+    const io = mem.io();
+    const dir = std.Io.Dir.cwd();// 不能直接使用？
+    var buffer: [1024]u8 = undefined;
+    const len = try dir.realPath(io, &buffer);
+    const absolute_path = buffer[0..len];
+    const dir2 = try std.Io.Dir.openDirAbsolute(io, absolute_path, .{.iterate = true});
+
+    return Dir{.dir=dir2, .mem=mem, .io=io};
+}
+code('''
+/// get a temp dir's absolute path
+pub fn getTempDir(mem: *Mem) !Dir {
+    const io = mem.io();
+    const random_dir_name = try getRandomName(mem.allocator(), 16);
+    const temp_dir_path = try Fs.joinPath(mem, &.{".cache/tmp", random_dir_name});
+    const cwd = std.Io.Dir.cwd();
+    const dir = try cwd.createDirPathOpen(io, temp_dir_path, .{.open_options = .{.iterate = true}});
+    //try cwd.createDirPath(io, temp_dir_path);
+    //var buffer: [1024]u8 = undhefined;
+    //const len = try cwd.realPath(io, &buffer);
+    //var absolute_path = buffer[0..len];
+    //absolute_path = try Fs.joinPath(mem, &.{absolute_path, temp_dir_path});
+    //std.debug.print("absolute_pat={s}\n", .{absolute_path});
+    //const dir = try std.Io.Dir.openDirAbsolute(io, absolute_path, .{.iterate = true});
+    return Dir{.dir=dir, .mem=mem, .io=io};
+}
+fn getRandomName(alloc: std.mem.Allocator, length: usize) ![]u8 {
+    var rand = std.Random.DefaultPrng.init(0);
+    const r = rand.random();
+    const char_set = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+    const result = try alloc.alloc(u8, length);
+    for (result) |*c| {
+        c.* = char_set[r.uintLessThan(usize, char_set.len)];
+    }
+
+    return result;
+}
+''');
+
+/// copy a file from source_dir to dest_dir
+pub fn copyFile(mem: *Mem, source_path: str, dest_path: str) CopyFileError!void {
+    try std.Io.Dir.copyFileAbsolute(source_path, dest_path, mem.io(), .{});
+}
+pub fn copyFile2(mem: *Mem, source_path: str, dest_path: str, options: CopyFileOptions) CopyFileError!void {
+    try std.Io.Dir.copyFileAbsolute(source_path, dest_path, mem.io(), options);
+}
+
+/// opens a directory at the absolute path. 
+pub fn openDirPath(mem: *Mem, absolute_path: str) !Dir {
+    const io = mem.io();
+    const dir = try std.Io.Dir.openDirAbsolute(io, absolute_path, .{.iterate = true});
+    return Dir{.dir=dir, .mem=mem, .io=io};
+}
+/// opens a directory at the absolute path with options 
+pub fn openDirPath2(mem: *Mem, absolute_path: str, options: OpenOptions) !Dir {
+    const io = mem.io();
+    const dir = try std.Io.Dir.openDirAbsolute(io, absolute_path, options);
+    return Dir{.dir=dir, .mem=mem, .io=io};
+}
+/// create a new directory, based on an absolute path.
+pub fn createDirPath(mem: *Mem, absolute_path: str) !void {
+    const io = mem.io();
+    try std.Io.Dir.createDirAbsolute(io, absolute_path, .default_file);
+}
+/// create all not exist directory, based on an absolute path.
+pub fn createDirPathAll(mem: *Mem, absolute_path: str) !void {
+    if (!Fs.isAbsolutePath(absolute_path)) return error.NotAbsolutePath;
+
+    const io = mem.io();
+    var new_path = try String.replaceStr(mem, absolute_path, "\\", "/");
+    defer mem.free2(new_path);
+
+    const dir_name_array = try String.splitStr(mem, new_path, "/");
+    defer mem.free2(dir_name_array);
+    new_path = "";
+    for (dir_name_array) |dir_name| {
+        new_path = try Fs.joinPath(mem, &[new_path, dir_name]);
+        if (!existPath(mem, new_path)) {
+            try std.Io.Dir.createDirAbsolute(io, new_path, .default_file);
+        }
+    }
+}
+/// change the name or location of a file or directory.
+pub fn renamePath(mem: *Mem, old_absolute_path: str, new_absolute_path: str) !void {
+    const io = mem.io();
+    return try std.Io.Dir.renameAbsolute(old_absolute_path, new_absolute_path, io);
+}
+/// exist the absolute path, will return true
+pub fn existPath(mem: *Mem, absolute_path: str) bool {
+    const io = mem.io();
+    std.Io.Dir.cwd().access(io, absolute_path, .{}) catch return false;
+    return true;
+}
+/// same as `Dir.deleteSubDir` except the path is absolute, the directory must be empty
+pub fn deleteDirPath(mem: *Mem, absolute_path: str) !void {
+    const io = mem.io();
+    try std.Io.Dir.deleteDirAbsolute(io, absolute_path);
+}
+/// removes a symlink, file, or directory at the absolute path, even the directory is not empty
+pub fn deleteAll(mem: *Mem, absolute_path: str) !void {
+    const io = mem.io();
+    const dir = try std.Io.Dir.openDirAbsolute(io, absolute_path, .{});
+    try dir.deleteTree(io, absolute_path);
+}

@@ -1,0 +1,73 @@
+pub const Thread = import("process/Thread.func");
+
+const Mem = import("Mem.func");
+const Console = import("io/Console.func");
+
+code(
+'''
+const std = @import("std");
+
+pub const Init = std.process.Init;
+pub const Environ = std.process.Environ;
+pub const RunResult = std.process.RunResult;
+
+/// run process
+pub fn run(mem: *Mem, argv: [][]const u8, environ_map: *Environ.Map) !void {
+    const io = mem.io();
+    const term_result = (term: {
+        _ = try io.lockStderr(&.{}, .no_color);
+        defer io.unlockStderr();
+
+        var child = std.process.spawn(io, .{
+            .argv = argv,
+            .environ_map = environ_map,
+            .stdin = .inherit,
+            .stdout = .inherit,
+            .stderr = .inherit,
+        }) catch |err| break :term err;
+        defer child.kill(io);
+
+        break :term child.wait(io);
+    });
+
+    _ = term_result catch |err| {
+        const cmd = try std.mem.join(mem.allocator(), " ", argv);
+        Console.print2("the following command failed with {t}:\n{s}", .{ err, cmd });
+    };
+}
+fn run2(mem: *Mem, argv: []const []const u8, io: std.Io) !Process {
+    const allocator = mem.allocator();
+    const result = try std.process.run(allocator, io, .{
+        .argv = argv,
+    });
+    if (!mem.auto_free) {
+        defer {
+            allocator.free(result.stderr);
+            allocator.free(result.stdout);
+        }
+    }
+
+    return Process{.argv=argv, .mem=mem, .result=result};
+}
+/// Exits all threads of the program with the specified status code.
+pub fn exit(status: u8) noreturn {
+    std.process.exit(status);
+}
+'''
+);
+
+argv: []str,
+mem: *Mem,
+result: RunResult,
+
+/// get and exe a Process
+pub fn a(mem: *Mem, argv: []str) !Process {
+    return try Process.run2(mem, argv, mem.io());
+}
+pub fn a2(mem: *Mem, argv: []str, io: std.Io) !Process {
+    return try Process.run2(mem, argv, io);
+}
+/// deinit a Process
+pub fn d(self: *Process) void {
+    self.* = undefined;
+}

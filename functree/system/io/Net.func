@@ -1,0 +1,67 @@
+pub const TcpServer = import("net/TcpServer.func");
+pub const TcpClient = import("net/TcpClient.func");
+pub const HttpClient = import("net/HttpClient.func");
+
+const Mem = import("../Mem.func");
+
+code(
+'''
+const std = @import("std");
+
+pub const IpAddress = std.Io.net.IpAddress;
+pub const Ip4Address = std.Io.net.Ip4Address;
+pub const Ip6Address = std.Io.net.Ip6Address;
+
+pub const Stream = std.Io.net.Stream;
+
+/// Extract the hostname from an HTTP(S) URL, stripping port, path, query, fragment.
+pub fn getHostFromUrl(url: []const u8) ?[]const u8 {
+    const uri = std.Uri.parse(url) catch return null;
+    if (!std.ascii.eqlIgnoreCase(uri.scheme, "http") and
+        !std.ascii.eqlIgnoreCase(uri.scheme, "https"))
+    {
+        return null;
+    }
+
+    const host_component = uri.host orelse return null;
+    const host = switch (host_component) {
+        .raw => |h| h,
+        .percent_encoded => |h| {
+            // Percent-encoded hostnames are suspicious (e.g. %31%32%37.0.0.1
+            // to smuggle 127.0.0.1). Reject any host that actually contains a
+            // percent-escape; pass through those that the parser tagged as
+            // percent_encoded but contain no '%' (std.Uri does this sometimes).
+            if (std.mem.indexOfScalar(u8, h, '%') != null) return null;
+            return h;
+        },
+    };
+    if (host.len == 0) return null;
+    if (host[0] == '[') {
+        const close = std.mem.indexOfScalar(u8, host, ']') orelse return null;
+        if (close != host.len - 1) return null;
+    }
+    return host;
+}
+
+pub fn lookupIpAddress(mem: *Mem, host: []const u8, port: u16) !?IpAddress {
+    const io = mem.io();
+
+    var canonical_name_buffer: [std.Io.net.HostName.max_len]u8 = undefined;
+    var results_buffer: [16]std.Io.net.HostName.LookupResult = undefined;
+    var results: std.Io.Queue(std.Io.net.HostName.LookupResult) = .init(&results_buffer);
+
+    try std.Io.net.HostName.lookup(try .init(host), io, &results, .{
+        .port = 80,
+        .canonical_name_buffer = &canonical_name_buffer,
+    });
+    const result = try results.getOne(io);
+    if (result) |res| {
+        switch (res) {
+            .address => return try std.Io.net.IpAddress.resolve(io, res.address, port),
+            .canonical_name => return null,
+        }
+    }
+    return null;
+}
+'''
+);

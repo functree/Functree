@@ -1,0 +1,429 @@
+const Mem = import("../Mem.func");
+const Char = import("Char.func");
+const List = import("List.func");
+
+code(
+'''
+const std = @import("std");
+const unicode = std.unicode;
+'''
+);
+
+mem: *Mem,
+bytes: []u8,
+
+// a String
+pub fn a(mem: *Mem, buffer: str) !String {
+    const self = String{
+        .mem = mem,
+        .bytes = try mem.allocator().dupe(u8, buffer),
+    };
+    return self;
+}
+// free String
+pub fn d(self: *String) void {
+    self.mem.free2(self.bytes);
+    self.* = undefined;
+}
+
+/// clone a newly String.
+pub fn clone(self: String) !String {
+    const buffer = try self.mem.allocator().dupe(u8, self.bytes);
+    return String{
+        .mem = self.mem,
+        .bytes = buffer,
+    };
+}
+pub fn concat(self: String, value: String) !String {
+    const buffer: []u8 = try std.mem.concat(self.mem.allocator(), u8, &[self.bytes, value.bytes]);
+    return String{
+        .mem = self.mem,
+        .bytes = buffer,
+    };
+}
+pub fn join(self: String, separator: str, value: String) !String {
+    const buffer: []u8 = try std.mem.join(self.mem.allocator(), separator, &[self.bytes, value.bytes]);
+    return String{
+        .mem = self.mem,
+        .bytes = buffer,
+    };
+}
+
+
+/// Find the index in a String of a sub-slice, searching from the start.
+pub fn indexOf(self: String, needle: str) ?usize {
+    return std.mem.indexOf(u8, self.bytes, needle);
+}
+/// Find the index in a String of a sub-slice, searching from the end backwards.
+pub fn lastIndexOf(self: String, needle: str) ?usize {
+    return std.mem.lastIndexOf(u8, self.bytes, needle);
+}
+
+/// Compares two String and returns whether they are equal.
+pub fn equal(self: String, value: String) bool {
+    return std.mem.eql(u8, self.bytes, value.bytes);
+}
+pub fn count(self: String, needle: str) usize {
+    return std.mem.count(u8, self.bytes, needle);
+}
+
+/// Truncate a UTF-8 slice to at most `max_len` bytes without splitting
+/// a multi-byte sequence. Backs up over trailing continuation bytes (0x80..0xBF).
+pub fn truncateUtf8(self: String, max_len: usize) String {
+    if (self.bytes.len <= max_len) return self.bytes;
+    var end: usize = max_len;
+    while (end > 0 and self.bytes[end] & 0xC0 == 0x80) {
+        end -= 1;
+    }
+    return String{
+        .mem = self.mem,
+        .bytes = self.bytes[0..end],
+    };
+}
+///To UTF-8 Char Array
+pub fn toUtf8Array(self: String) ![]str {
+    var list = try self.toUtf8List();
+    return try list.toArray();
+}
+///To UTF-8 Char List
+pub fn toUtf8List(self: String) !List.t([]u8) {
+    var list = List.t([]u8).a(self.mem);
+    errdefer list.d();
+
+    var it = try Char.getUtf8Iter(self.bytes);
+    while (it.nextCodepointSlice()) |buffer| {
+        try list.add(try self.mem.allocator().dupe(u8, buffer));
+    }
+    return list;
+}
+
+pub fn toStr(self: String) str {
+    return self.bytes[0..];
+}
+
+/// Replace needle with replacement as many times as possible
+/// The needle must not be empty.
+/// Returns a new String.
+pub fn replace(self: String, needle: str, replacement: str) !String {
+    const size = std.mem.replacementSize(u8, self.bytes[0..], needle, replacement);
+    const buffer = try self.mem.alloc2(u8, size);
+    _ = std.mem.replace(u8, self.bytes[0..], needle, replacement, buffer);
+
+    return String{
+        .mem = self.mem,
+        .bytes = buffer,
+    };
+}
+
+pub fn startWith(self: String, needle: str) bool {
+    return std.mem.startsWith(u8, self.bytes, needle);
+}
+pub fn endWith(self: String, needle: str) bool {
+    return std.mem.endsWith(u8, self.bytes, needle);
+}
+
+/// Returns a slices of `buffer` that are separated by the byte sequence in `delimiter`.
+pub fn split(self: String, delimiter: str) ![]String {
+    var splitArr = List.t(String).a(self.mem);
+    errdefer splitArr.d();
+
+    var it = std.mem.splitSequence(u8, self.bytes, delimiter);
+    while (it.next()) |item| {
+        const string = String{
+            .mem = self.mem,
+            .bytes = try self.mem.allocator().dupe(u8, item),
+        };
+        try splitArr.add(string);
+    }
+    return try splitArr.toArray();
+}
+
+/// Converts all (ASCII) uppercase letters to lowercase
+pub fn lower(self: String) !String {
+    var result = List.t(u8).a(self.mem);
+    errdefer result.d();
+
+    var iter = std.unicode.Utf8Iterator{ .bytes = self.bytes[0..], .i = 0 };
+
+    while (iter.nextCodepoint()) |cp| {
+        const lower_cp: u21 = if (cp >= 'A' and cp <= 'Z')
+            cp + 32
+        else
+            cp;
+
+        var buf: [4]u8 = undefined;
+        const len = try std.unicode.utf8Encode(lower_cp, &buf);
+        try result.addArray(buf[0..len]);
+    }
+
+    return String{
+        .mem = self.mem,
+        .bytes = try result.toArray(),
+    };
+}
+/// Converts all (ASCII) lowercase letters to uppercase
+pub fn upper(self: String) !String {
+    var result = List.t(u8).a(self.mem);
+    errdefer result.d();
+
+    var iter = std.unicode.Utf8Iterator{ .bytes = self.bytes[0..], .i = 0 };
+
+    while (iter.nextCodepoint()) |cp| {
+        const upper_cp: u21 = if (cp >= 'a' and cp <= 'z')
+            cp - 32
+        else
+            cp;
+
+        var buf: [4]u8 = undefined;
+        const len = try std.unicode.utf8Encode(upper_cp, &buf);
+        try result.addArray(buf[0..len]);
+    }
+
+    return String{
+        .mem = self.mem,
+        .bytes = try result.toArray(),
+    };
+}
+pub fn trim(self: String) !String {
+    const buffer = std.mem.trim(u8, self.bytes, " \r\n");
+    return String{
+        .mem = self.mem,
+        .bytes = try self.mem.allocator().dupe(u8, buffer),
+    };
+}
+pub fn trimLeft(self: String) !String {
+    const buffer = std.mem.trimStart(u8, self.bytes, " \r\n");
+    return String{
+        .mem = self.mem,
+        .bytes = try self.mem.allocator().dupe(u8, buffer),
+    };
+}
+pub fn trimRight(self: String) !String {
+    const buffer = std.mem.trimEnd(u8, self.bytes, " \n");
+    return String{
+        .mem = self.mem,
+        .bytes = try self.mem.allocator().dupe(u8, buffer),
+    };
+}
+
+
+pub fn isEmptyStr(value: ?str) bool {
+    if (value != null) {
+        const value2 = trimStr(value.?);
+        if (value2.len > 0) return false;
+    }
+    return true;
+}
+/// Returns true if the input str is number
+pub fn isNumberStr(value: str) bool {
+    if (value.len == 0) return false;
+
+    var i: usize = 0;
+    var hasDecimal = false;
+    var hasSign = false;
+
+    if (value[i] == '+' or value[i] == '-') {
+        hasSign = true;
+        i += 1;
+    }
+
+    while (i < value.len) {
+        const ch = value[i];
+        i += 1;
+
+        if (ch >= '0' and ch <= '9') {
+            continue;
+        }
+
+        if (ch == '.') {
+            if (hasDecimal) {
+                return false;
+            }
+            hasDecimal = true;
+            continue;
+        }
+
+        return false;
+    }
+
+    var singn_count: usize = 0;
+    if (hasSign) singn_count = 1;
+    return i > singn_count;
+}
+/// Returns true if the input str is UTF-8
+pub fn isUtf8Str(value: str) bool {
+    return unicode.utf8ValidateSlice(value);
+}
+/// Truncate a UTF-8 slice to at most `max_len` bytes without splitting
+/// a multi-byte sequence. Backs up over trailing continuation bytes (0x80..0xBF).
+pub fn truncateUtf8Str(value: str, max_len: usize) str {
+    if (value.len <= max_len) return value;
+    var end: usize = max_len;
+    while (end > 0 and value[end] & 0xC0 == 0x80) {
+        end -= 1;
+    }
+    return value[0..end];
+}
+///To UTF-8 Char Array
+pub fn toUtf8ArrayStr(mem: *Mem, value: str) ![]str {
+    var list = try toUtf8ListStr(mem, value);
+    return try list.toArray();
+}
+///To UTF-8 Char List
+pub fn toUtf8ListStr(mem: *Mem, value: str) !List.t([]u8) {
+    var list = List.t([]u8).a(mem);
+    errdefer list.d();
+
+    var it = try Char.getUtf8Iter(value);
+    while (it.nextCodepointSlice()) |buffer| {
+        try list.add(try mem.allocator().dupe(u8, buffer));
+    }
+    return list;
+}
+
+pub fn copyStr(mem: *Mem, value: str) ![]u8 {
+    return try mem.allocator().dupe(u8, value);
+}
+pub fn copySubStr(mem: *Mem, value: str, start: usize, end: usize) !str {
+    return try mem.allocator().dupe(u8, value[start..end]);
+}
+
+pub fn concatStr(mem: *Mem, slices: []str) ![]u8 {
+    return try std.mem.concat(mem.allocator(), u8, slices);
+}
+
+/// Naively combines a series of slices with a separator.
+pub fn joinStr(mem: *Mem, separator: str, slices: []str) ![]u8 {
+    return try std.mem.join(mem.allocator(), separator, slices);
+}
+
+pub fn formatStr(mem: *Mem, comptime fmt: str, values: anytype) ![]u8 {
+    return try std.fmt.allocPrint(mem.allocator(), fmt, values);
+}
+pub fn formatStr2(buffer: []u8, comptime fmt: str, values: anytype) ![]u8 {
+    return try std.fmt.bufPrint(buffer, fmt, values);
+}
+
+/// Replace needle with replacement as many times as possible.
+/// The needle must not be empty.
+pub fn replaceStr(mem: *Mem, value: str, needle: str, replacement: str) ![]u8 {
+    const size = std.mem.replacementSize(u8, value, needle, replacement);
+    const buffer = try mem.alloc2(u8, size);
+    _ = std.mem.replace(u8, value, needle, replacement, buffer);
+
+    return buffer;
+}
+pub fn replaceStr2(buffer: []u8, value: str, needle: str, replacement: str) []u8 {
+    var i: usize = 0;
+    var index: usize = 0;
+    while (index < value.len) {
+        if (std.mem.startsWith(u8, value[index..], needle)) {
+            Mem.copy(buffer[i..][0..replacement.len], replacement);
+            i += replacement.len;
+            index += needle.len;
+        } else {
+            buffer[i] = value[index];
+            i += 1;
+            index += 1;
+        }
+    }
+
+    return buffer[0..index];
+}
+
+/// Returns the number of needle inside the buffer
+pub fn countStr(value: str, needle: str) usize {
+    return std.mem.count(u8, value, needle);
+}
+
+pub fn equalStr(value1: str, value2: str) bool {
+    return std.mem.eql(u8, value1, value2);
+}
+
+/// Find the index in a slice of a sub-slice, searching from the start.
+pub fn indexOfStr(value: str, needle: str) ?usize {
+    return std.mem.indexOf(u8, value, needle);
+}
+pub fn indexOfStrPos(value: str, start_index: usize, needle: u8) ?usize {
+    return std.mem.findScalarPos(u8, value, start_index, needle);
+}
+/// Find the index in a slice of a sub-slice, searching from the end backwards.
+pub fn lastIndexOfStr(value: str, needle: str) ?usize {
+    return std.mem.lastIndexOf(u8, value, needle);
+}
+
+/// Returns a slices of `buffer` that are separated by the byte sequence in `delimiter`.
+pub fn splitStr(mem: *Mem, value: str, delimiter: str) ![]str {
+    const allocator = mem.allocator();
+    code(
+    '''
+    var splitArr: std.ArrayList([]const u8) = .empty;
+    defer splitArr.deinit(allocator);
+    '''
+    );
+    var it = std.mem.splitSequence(u8, value, delimiter);
+    while (it.next()) |item| {
+        try splitArr.append(allocator, item);
+    }
+    return try splitArr.toOwnedSlice(allocator);
+}
+
+/// Converts all (ASCII) uppercase letters to lowercase
+pub fn lowerStr(mem: *Mem, value: str) !str {
+    var result = List.t(u8).a(mem);
+    errdefer result.d();
+
+    var iter = std.unicode.Utf8Iterator{ .bytes = value, .i = 0 };
+
+    while (iter.nextCodepoint()) |cp| {
+        const lower_cp: u21 = if (cp >= 'A' and cp <= 'Z')
+            cp + 32
+        else
+            cp;
+
+        var buf: [4]u8 = undefined;
+        const len = try std.unicode.utf8Encode(lower_cp, &buf);
+        try result.addArray(buf[0..len]);
+    }
+
+    return try result.toArray();
+}
+/// Converts all (ASCII) lowercase letters to uppercase
+pub fn upperStr(mem: *Mem, value: str) !str {
+    var result = List.t(u8).a(mem);
+    errdefer result.d();
+
+    var iter = std.unicode.Utf8Iterator{ .bytes = value, .i = 0 };
+
+    while (iter.nextCodepoint()) |cp| {
+        const upper_cp: u21 = if (cp >= 'a' and cp <= 'z')
+            cp - 32
+        else
+            cp;
+
+        var buf: [4]u8 = undefined;
+        const len = try std.unicode.utf8Encode(upper_cp, &buf);
+        try result.addArray(buf[0..len]);
+    }
+
+    return try result.toArray();
+}
+
+pub fn startWithStr(value: str, needle: str) bool {
+    return std.mem.startsWith(u8, value, needle);
+}
+pub fn endWithStr(value: str, needle: str) bool {
+    return std.mem.endsWith(u8, value, needle);
+}
+pub fn trimStr(value: str) str {
+    return std.mem.trim(u8, value, " \t\r\n");
+}
+pub fn trimStr2(value: str, value_to_strip: str) str {
+    return std.mem.trim(u8, value, value_to_strip);
+}
+pub fn trimLeftStr(value: str) str {
+    return std.mem.trimStart(u8, value, " \t\r\n");
+}
+pub fn trimRightStr(value: str) str {
+    return std.mem.trimEnd(u8, value, " \t\r\n");
+}

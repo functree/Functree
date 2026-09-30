@@ -1,18 +1,20 @@
-const Memory = @import("../Memory.zig");
+const Mem = import("../Mem.func");
 
+code(
+'''
 const std = @import("std");
 
 pub fn t(comptime V: type) type {
-    return struct {
+    return struct{
         const Self = @This();
-        memory: *Memory,
+        mem: *Mem,
         map: std.StringHashMap(V),
 
         /// free memory by caller
-        pub fn a(memory: *Memory) Self {
-            const map = std.StringHashMap(V).init(memory.allocator());
+        pub fn a(mem: *Mem) Self {
+            const map = std.StringHashMap(V).init(mem.allocator());
             return Self{
-                .memory = memory,
+                .mem = mem,
                 .map = map,
             };
         }
@@ -46,7 +48,7 @@ pub fn t(comptime V: type) type {
             return self.map.remove(key);
         }
         pub fn keys(self: Self) ![]const []const u8 {
-            var key_array = try self.memory.alloc2([]const u8, self.count());
+            var key_array = try self.mem.alloc2([]const u8, self.count());
             var iter = self.map.keyIterator();
             var i: usize = 0;
             while (iter.next()) |key| {
@@ -56,7 +58,7 @@ pub fn t(comptime V: type) type {
             return key_array;
         }
         pub fn values(self: Self) ![]const V {
-            var value_array = try self.memory.alloc2(V, self.count());
+            var value_array = try self.mem.alloc2(V, self.count());
             var iter = self.map.valueIterator();
             var i: usize = 0;
             while (iter.next()) |value| {
@@ -67,5 +69,5 @@ pub fn t(comptime V: type) type {
         }
     };
 }
-
-const StringMap = @This();
+'''
+);

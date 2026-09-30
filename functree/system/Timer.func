@@ -1,0 +1,66 @@
+code(
+'''
+const std = @import("std");
+const Thread = std.Thread;
+
+const Callback = *const fn () void;
+'''
+);
+
+callback: Callback,
+interval: u64, // in milliseconds
+running: bool = false,
+single_thread: bool = false,
+thread: ?Thread = null,
+io: std.Io,
+
+/// time interval in milliseconds
+pub fn a(callback: Callback) Timer {
+    return Timer{
+        .interval = 1000,
+        .callback = callback,
+        .io = std.Io.Threaded.global_single_threaded.io(),
+    };
+}
+pub fn a2(callback: Callback, interval: u64) Timer {
+    return Timer{
+        .callback = callback,
+        .interval = interval,
+        .io = std.Io.Threaded.global_single_threaded.io(),
+    };
+}
+pub fn a3(callback: Callback, interval: u64, single_thread: bool) Timer {
+    return Timer{
+        .callback = callback,
+        .interval = interval,
+        .single_thread = single_thread,
+        .io = std.Io.Threaded.global_single_threaded.io(),
+    };
+}
+
+pub fn start(self: *Timer) void {
+    self.running = true;
+    if (self.single_thread) {
+        self.runTimer();
+    } else {
+        self.thread = Thread.spawn(.{}, runTimer, .{self}) catch |err| return catchError(err);
+    }
+}
+fn catchError(err: anytype) void {
+    std.debug.print("Failed to start timer thread: {}\n", .{err});
+    return;
+}
+pub fn stop(self: *Timer) void {
+    self.running = false;
+    if (self.thread != null) {
+        self.thread.?.join();
+    }
+}
+fn runTimer(self: *Timer) void {
+    while (self.running) {
+        self.callback();
+        const nanoseconds = self.interval * 1_000_000;
+        std.Io.Clock.Duration.sleep(.{ .clock = .boot, .raw = .fromNanoseconds(nanoseconds) }, self.io) catch {};
+        // Thread.sleep(nanoseconds);
+    }
+}

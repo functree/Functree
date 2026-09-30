@@ -1,0 +1,63 @@
+pub const AtomicValue = import("thread/AtomicValue.func");
+pub const Group = import("thread/Group.func");
+
+const Mem = import("../Mem.func");
+const String = import("../datatype/String.func");
+
+code(
+'''
+const std = @import("std");
+'''
+);
+
+pub const max_name_len = std.Thread.max_name_len;
+
+mem: *Mem,
+thread: std.Thread,
+io: std.Io,
+
+/// spawn a Thread
+pub fn a(mem: *Mem, comptime function: anytype, args: anytype) !Thread {
+    const io = mem.io();
+    const thread = try std.Thread.spawn(.{}, function, args);
+    return .{.mem=mem, .thread=thread, .io=io};
+}
+pub fn a2(mem: *Mem, comptime function: anytype, args: anytype, io: std.Io) !Thread {
+    const thread = try std.Thread.spawn(.{}, function, args);
+    return .{.mem=mem, .thread=thread, .io=io};
+}
+/// deinit a Thread
+pub fn d(self: *Thread) void {
+    self.* = undefined;
+}
+
+/// set name of the Thread
+pub fn setName(self: Thread, name: str) !void {
+    try self.thread.setName(self.io, name);
+}
+/// get name of the Thread
+pub fn getName(self: Thread) !?str {
+    var buffer: [max_name_len: 0]u8 = undefined;
+    const name = try self.thread.getName(&buffer);
+    if (name == null) {
+        return null;
+    } else {
+        return try String.copyStr(self.mem, name.?);
+    }
+}
+
+/// Waits for the thread to complete, then deallocates any resources created on `a()`.
+pub fn sync(self: Thread) void {
+    self.thread.join();
+}
+/// Release the obligation of the caller to call `join()` and have the thread clean up its own resources on completion
+pub fn async(self: Thread) void {
+    self.thread.detach();
+}
+
+/// Spurious wakeups are possible and no precision of timing is guaranteed.
+pub fn sleep(nanoseconds: u64) void {
+    const io = std.Io.Threaded.global_single_threaded.io();
+    std.Io.Clock.Duration.sleep(.{ .clock = .boot, .raw = .fromNanoseconds(nanoseconds) }, io) catch {};
+    //std.Thread.sleep(nanoseconds);
+}

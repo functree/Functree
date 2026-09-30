@@ -1,0 +1,161 @@
+const Mem = import("../../Mem.func");
+const String = import("../../datatype/String.func");
+
+const Fs = import("../Fs.func");
+const Dir = import("Dir.func");
+
+code(
+'''
+const std = @import("std");
+
+pub const OpenFileError = std.Io.File.OpenError;
+pub const DeleteFileError = std.Io.Dir.DeleteFileError;
+pub const Reader = std.Io.File.Reader;
+pub const Writer = std.Io.File.Writer;
+pub const ReadError = std.Io.File.ReadError;
+pub const WriteError = std.Io.File.WriteError;
+
+pub const Kind = std.Io.File.Kind;
+pub const OpenMode = std.Io.File.OpenMode;
+pub const OpenFlags = std.Io.File.OpenFlags;
+pub const OpenError = std.Io.File.OpenError;
+pub const CreateFlags = std.Io.File.CreateFlags;
+pub const WriteFileOptions = std.Io.File.WriteFileOptions;
+pub const Stat = std.Io.File.Stat;
+
+file: std.Io.File,
+mem: *Mem,
+io: std.Io,
+reader: ?Reader = null,
+'''
+);
+
+/// get a File, if not exist will create it
+pub fn a(mem: *Mem, file_path: str) !File {
+    const io = mem.io();
+    return a2(mem, file_path, io);
+}
+/// get a File with io, if not exist will create it
+pub fn a2(mem: *Mem, file_path: str, io: std.Io) !File {
+    var file: ?std.Io.File = null;
+    var absolute_path = file_path;
+    if (std.fs.path.isAbsolute(file_path)) {
+        file = std.Io.Dir.openFileAbsolute(io, file_path, .{.mode = .read_write}) catch null;
+    } else {
+        file = std.Io.Dir.cwd().openFile(io, file_path, .{.mode = .read_write}) catch null;
+        if (file == null) {
+            var dir = try Dir.getCurrentDir(mem);
+            defer dir.d();
+            const dir_path = try dir.getAbsolutePath();
+            defer mem.free2(dir_path);
+
+            absolute_path = Fs.joinPath(mem, &[dir_path, file_path]) catch unreachable;
+        }
+    }
+    if (file == null) {
+        return try create(mem, absolute_path);
+    } else {
+        return File{.file=file.?, .mem=mem, .io=io};
+    }
+}
+/// deinit a File
+pub fn d(self: *File) void {
+    self.file.close(self.io);
+    self.* = undefined;
+}
+
+/// get file length
+pub fn len(self: File) !u64 {
+    return try self.file.length(self.mem.io());
+}
+pub fn stat(self: File) !Stat {
+    return try self.file.stat(self.mem.io());
+}
+/// read buffer length content from one position in this file
+pub fn read(self: *File, buffer: []u8) !usize {
+    if (self.reader == null) {
+        self.reader = self.file.reader(self.io, &.{});
+    }
+    return try self.reader.?.interface.readSliceShort(buffer);
+}
+/// read lines from this file
+pub fn readLine(self: *File) !?[]u8 {
+    if (self.reader == null) {
+        const file_len = try self.len();
+        if (file_len == 0) return null;
+        const read_buf = try self.mem.alloc2(u8, file_len);
+        self.reader = self.file.reader(self.io, read_buf);
+    }
+    return try self.reader.?.interface.takeDelimiter('\n');
+}
+/// read all content from this file
+pub fn readAll(self: File) ![]u8 {
+    const file_len = try self.file.length(self.io);
+    if (file_len == 0) return "";
+
+    const buffer = try self.mem.alloc2(u8, file_len);
+    const n = try self.file.readPositionalAll(self.io, buffer, 0);
+    //var reader = self.file.reader(self.io, &.{});
+    //const n = try reader.interface.readSliceShort(buffer);
+    if (n == 0) {
+        return "";
+    } else {
+        return buffer;
+    }
+}
+/// append content to this file
+pub fn append(self: File, value: str) !void {
+    const offset = try self.len();
+    // const info = try self.stat();
+    // const offset = info.size;
+    try self.file.writePositionalAll(self.io, value, offset);
+}
+/// write content to this file
+pub fn writeAll(self: File, value: str) !void {
+    // try self.file.writeStreamingAll(self.io, value);
+    var writer = self.file.writer(self.io, &.{});
+    try writer.interface.writeAll(value);
+    try writer.end();
+}
+
+/// create a file
+pub fn create(mem: *Mem, absolute_path: str) OpenFileError!File {
+    const io = mem.io();
+    return try create2(mem, absolute_path, io);
+}
+/// create a file with io
+pub fn create2(mem: *Mem, absolute_path: str, io: std.Io) OpenFileError!File {
+    return try create3(mem, absolute_path, io, .{.read = true, .truncate = true});
+}
+/// create a file with io
+pub fn create3(mem: *Mem, absolute_path: str, io: std.Io, flags: CreateFlags) OpenFileError!File {
+    const file = try std.Io.Dir.createFileAbsolute(io, absolute_path, flags);
+
+    return File{.file=file, .mem=mem, .io=io};
+}
+/// delete a file
+pub fn delete(mem: *Mem, absolute_path: str) DeleteFileError!void {
+    try std.Io.Dir.deleteFileAbsolute(mem.io(), absolute_path);
+}
+/// open a file
+pub fn open(mem: *Mem, file_path: str) OpenFileError!File {
+    const io = mem.io();
+    var file: ?std.Io.File = null;
+    if (std.fs.path.isAbsolute(file_path)) {
+        file = try std.Io.Dir.openFileAbsolute(io, file_path, .{.mode = .read_write});
+    } else {
+        file = try std.Io.Dir.cwd().openFile(io, file_path, .{.mode = .read_write});
+    }
+
+    return File{.file=file.?, .mem=mem, .io=io};
+}
+pub fn open2(mem: *Mem, file_path: str, io: std.Io) OpenFileError!File {
+    var file: ?std.Io.File = null;
+    if (std.fs.path.isAbsolute(file_path)) {
+        file = try std.Io.Dir.openFileAbsolute(io, file_path, .{.mode = .read_write});
+    } else {
+        file = try std.Io.Dir.cwd().openFile(io, file_path, .{.mode = .read_write});
+    }
+
+    return File{.file=file.?, .mem=mem, .io=io};
+}

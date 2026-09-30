@@ -1,0 +1,49 @@
+const System = import("System.func");
+const DataType = System.DataType;
+const StaticStringMap = DataType.StaticStringMap;
+const Os = System.Os;
+const Cpu = System.Cpu;
+
+pub const version: str = "0.16.0"; // Functree版本号
+
+pub const output_tmp_dir_path: str = ".funcfile"; // 临时输出目录相对路径
+pub const reserve_target_code_file: bool = true; // 保留目标代码文件
+pub const reserve_token_file: bool = false; // 保留token临时文件
+pub const reserve_code_node_file: bool = false; // 保留code node临时文件
+
+pub var main_source_file_path: str = undefined; // 主程序文件路径
+pub var output_type: OutPutType = .run; // 编译输出类型，默认为：run
+pub var output_tmp_dir_absolute_path: str = undefined; // 临时输出目录绝对路径
+pub var extra_cmd_args: []str = undefined; // 命令附加参数
+
+pub const single_thread: bool = false; // 单线程
+pub const is_test = System.isTest();
+pub const abi: Os.Abi = System.getAbi();
+pub const cpu = System.getCpu();
+pub const os: Os = System.getOs();
+pub const object_format: Os.ObjectFormat = System.getObjectFormat(os.tag, cpu.arch);
+pub const target_system: System = .{
+    .cpu = cpu,
+    .os = os,
+    .abi = abi,
+    .ofmt = object_format,
+};
+
+pub const OutPutType = enum {
+    build_exe,
+    build_lib,
+    build_obj,
+    _test,
+    run,
+    version,
+    help,
+};
+pub const OutPutTypeMap = StaticStringMap.t(OutPutType).a(.{
+    .{ "build-exe", .build_exe },
+    .{ "build-lib", .build_lib },
+    .{ "build-obj", .build_obj },
+    .{ "test", ._test },
+    .{ "run", .run },
+    .{ "version", .version },
+    .{ "help", .help },
+});

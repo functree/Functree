@@ -1,0 +1,73 @@
+const Mem = import("../Mem.func");
+
+code(
+'''
+const std = @import("std");
+
+pub fn t(comptime T: type) type {
+    return struct{
+        const Self = @This();
+        mem: *Mem,
+        list: std.ArrayList(T) = .empty,
+
+        /// free memory by caller.
+        pub fn a(mem: *Mem) Self {
+            return Self{
+                .mem = mem,
+            };
+        }
+        pub fn a2(mem: *Mem, slice: []T) !Self {
+            var self = Self{
+                .mem = mem,
+            };
+            try self.list.insertSlice(self.mem.allocator(), 0, slice);
+            return self;
+        }
+        /// Release all allocated memory
+        pub fn d(self: *Self) void {
+            self.list.deinit(self.mem.allocator());
+            self.* = undefined;
+        }
+
+        pub fn clone(self: Self) !Self {
+            const list = try self.list.clone(self.mem.allocator());
+            return Self{
+                .mem = self.mem,
+                .list = list,
+            };
+        }
+
+        pub fn values(self: Self) []T {
+            return self.list.items;
+        }
+        pub fn count(self: Self) usize {
+            return self.list.items.len;
+        }
+        pub fn add(self: *Self, value: T) !void {
+            try self.list.append(self.mem.allocator(), value);
+        }
+        pub fn add2(self: *Self, i: usize, value: T) !void {
+            try self.list.insert(self.mem.allocator(), i, value);
+        }
+        pub fn addArray(self: *Self, slice: []const T) !void {
+            try self.list.appendSlice(self.mem.allocator(), slice);
+        }
+        pub fn addArray2(self: *Self, i: usize, slice: []const T) !void {
+            try self.list.insertSlice(self.mem.allocator(), i, slice);
+        }
+        /// Remove and return the last element from the list, or return `null` if list is empty.
+        /// Invalidates element pointers to the removed element, if any.
+        pub fn pop(self: *Self) ?T {
+            return self.list.pop();
+        }
+        /// Invalidates all element pointers.
+        pub fn clear(self: *Self) void {
+            return self.list.clearAndFree();
+        }
+        pub fn toArray(self: *Self) ![]T {
+            return try self.list.toOwnedSlice(self.mem.allocator());
+        }
+    };
+}
+'''
+);

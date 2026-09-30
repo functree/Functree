@@ -1,0 +1,100 @@
+pub const Char = import("datatype/Char.func");
+pub const Date = import("datatype/Date.func");
+pub const DateTime = import("datatype/DateTime.func");
+pub const Float = import("datatype/Float.func");
+pub const Integer = import("datatype/Integer.func");
+pub const Json = import("datatype/Json.func");
+pub const List = import("datatype/List.func");
+pub const Map = import("datatype/Map.func");
+pub const StringMap = import("datatype/StringMap.func");
+pub const StaticStringMap = import("datatype/StaticStringMap.func");
+pub const Result = import("datatype/Result.func");
+pub const String = import("datatype/String.func");
+pub const Tensor = import("datatype/Tensor.func");
+
+
+code(
+'''
+const std = @import("std");
+const builtin = std.builtin;
+
+// ── 类型转换 ──
+pub inline fn cast(comptime T: type, value: anytype) T {
+    return @as(T, value);
+}
+pub inline fn bitCast(comptime T: type, value: anytype) T {
+    return @as(T, @bitCast(value));
+}
+pub inline fn truncate(value: anytype) @TypeOf(value) {
+    return @truncate(value);
+}
+
+pub inline fn intCast(comptime T: type, value: anytype) T {
+    return @as(T, @intCast(value));
+}
+pub inline fn intFromEnum(comptime T: type, value: anytype) T {
+    return @as(T, @intFromEnum(value));
+}
+pub inline fn intFromFloat(comptime T: type, value: anytype) T {
+    return @as(T, @intFromFloat(value));
+}
+pub inline fn floatCast(comptime T: type, value: anytype) T {
+    return @as(T, @floatCast(value));
+}
+pub inline fn floatFromInt(comptime T: type, value: anytype) T {
+    return @as(T, @floatFromInt(value));
+}
+
+// ── 类型内省 ──
+pub inline fn typeOf(value: anytype) type {
+    return @TypeOf(value);
+}
+pub inline fn typeInfo(comptime T: type) builtin.Type {
+    return @typeInfo(T);
+}
+pub inline fn typeName(T: type) []const u8 {
+    return @typeName(T);
+}
+pub inline fn hasDecl(comptime T: type, comptime name: []const u8) bool {
+    return @hasDecl(T, name);
+}
+pub inline fn hasField(comptime T: type, comptime name: []const u8) bool {
+    return @hasField(T, name);
+}
+pub inline fn fieldCount(comptime T: type) usize {
+    return @typeInfo(T).@"struct".fields.len;
+}
+
+// ── 编译期运算 ──
+pub inline fn sizeOf(comptime T: type) comptime_int {
+    return @sizeOf(T);
+}
+pub inline fn alignOf(comptime T: type) comptime_int {
+    return @alignOf(T);
+}
+pub inline fn bitSizeOf(comptime T: type) comptime_int {
+    return @bitSizeOf(T);
+}
+pub inline fn offsetOf(comptime T: type, comptime field_name: []const u8) comptime_int {
+    return @offsetOf(T, field_name);
+}
+
+// ── 内存/指针 ──
+pub inline fn ptrFromInt(comptime T: type, address: usize) T {
+    return @as(T, @ptrFromInt(address));
+}
+pub inline fn intFromPtr(ptr: anytype) usize {
+    return @intFromPtr(ptr);
+}
+pub inline fn ptrCast(comptime T: type, ptr: anytype) T {
+    return @ptrCast(@alignCast(ptr));
+}
+pub inline fn constCast(value: anytype) @TypeOf(value) {
+    return @constCast(value);
+}
+pub inline fn volatileCast(comptime T: type, value: anytype) T {
+    return @volatileCast(value);
+}
+
+'''
+);

@@ -1,0 +1,154 @@
+const Mem = import("../../Mem.func");
+
+code(
+'''
+const std = @import("std");
+const builtin = @import("builtin");
+const AtomicOrder = std.builtin.AtomicOrder;
+
+pub fn t(comptime T: type) type {
+    return extern struct {
+        /// Care must be taken to avoid data races when interacting with this field directly.
+        value: T,
+
+        const Self = @This();
+
+        pub fn a(value: T) Self {
+            return .{ .value = value };
+        }
+
+        pub inline fn get(self: *const Self) T {
+            return @atomicLoad(T, &self.value, .seq_cst);
+        }
+        pub inline fn load(self: *const Self, comptime order: AtomicOrder) T {
+            return @atomicLoad(T, &self.value, order);
+        }
+
+        pub inline fn set(self: *Self, value: T) void {
+            @atomicStore(T, &self.value, value, .seq_cst);
+        }
+        pub inline fn store(self: *Self, value: T, comptime order: AtomicOrder) void {
+            @atomicStore(T, &self.value, value, order);
+        }
+
+        pub inline fn swap(self: *Self, operand: T, comptime order: AtomicOrder) T {
+            return @atomicRmw(T, &self.value, .Xchg, operand, order);
+        }
+
+        pub inline fn cmpxchgWeak(
+            self: *Self,
+            expected_value: T,
+            new_value: T,
+            comptime success_order: AtomicOrder,
+            comptime fail_order: AtomicOrder,
+        ) ?T {
+            return @cmpxchgWeak(T, &self.value, expected_value, new_value, success_order, fail_order);
+        }
+
+        pub inline fn cmpxchgStrong(
+            self: *Self,
+            expected_value: T,
+            new_value: T,
+            comptime success_order: AtomicOrder,
+            comptime fail_order: AtomicOrder,
+        ) ?T {
+            return @cmpxchgStrong(T, &self.value, expected_value, new_value, success_order, fail_order);
+        }
+
+        pub inline fn getAdd(self: *Self, operand: T) T {
+            return @atomicRmw(T, &self.value, .Add, operand, .monotonic);
+        }
+        pub inline fn fetchAdd(self: *Self, operand: T, comptime order: AtomicOrder) T {
+            return @atomicRmw(T, &self.value, .Add, operand, order);
+        }
+
+        pub inline fn getSub(self: *Self, operand: T) T {
+            return @atomicRmw(T, &self.value, .Sub, operand, .monotonic);
+        }
+        pub inline fn fetchSub(self: *Self, operand: T, comptime order: AtomicOrder) T {
+            return @atomicRmw(T, &self.value, .Sub, operand, order);
+        }
+
+        pub inline fn getMin(self: *Self, operand: T) T {
+            return @atomicRmw(T, &self.value, .Min, operand, .seq_cst);
+        }
+        pub inline fn fetchMin(self: *Self, operand: T, comptime order: AtomicOrder) T {
+            return @atomicRmw(T, &self.value, .Min, operand, order);
+        }
+
+        pub inline fn getMax(self: *Self, operand: T) T {
+            return @atomicRmw(T, &self.value, .Max, operand, .seq_cst);
+        }
+        pub inline fn fetchMax(self: *Self, operand: T, comptime order: AtomicOrder) T {
+            return @atomicRmw(T, &self.value, .Max, operand, order);
+        }
+
+        pub inline fn getAnd(self: *Self, operand: T) T {
+            return @atomicRmw(T, &self.value, .And, operand, .seq_cst);
+        }
+        pub inline fn fetchAnd(self: *Self, operand: T, comptime order: AtomicOrder) T {
+            return @atomicRmw(T, &self.value, .And, operand, order);
+        }
+
+        pub inline fn getNand(self: *Self, operand: T) T {
+            return @atomicRmw(T, &self.value, .Nand, operand, .seq_cst);
+        }
+        pub inline fn fetchNand(self: *Self, operand: T, comptime order: AtomicOrder) T {
+            return @atomicRmw(T, &self.value, .Nand, operand, order);
+        }
+
+        pub inline fn getXor(self: *Self, operand: T) T {
+            return @atomicRmw(T, &self.value, .Xor, operand, .seq_cst);
+        }
+        pub inline fn fetchXor(self: *Self, operand: T, comptime order: AtomicOrder) T {
+            return @atomicRmw(T, &self.value, .Xor, operand, order);
+        }
+
+        pub inline fn getOr(self: *Self, operand: T) T {
+            return @atomicRmw(T, &self.value, .Or, operand, .seq_cst);
+        }
+        pub inline fn fetchOr(self: *Self, operand: T, comptime order: AtomicOrder) T {
+            return @atomicRmw(T, &self.value, .Or, operand, order);
+        }
+
+        pub inline fn rmw(
+            self: *Self,
+            comptime op: std.builtin.AtomicRmwOp,
+            operand: T,
+            comptime order: AtomicOrder,
+        ) T {
+            return @atomicRmw(T, &self.value, op, operand, order);
+        }
+
+        const Bit = std.math.Log2Int(T);
+
+        /// Marked `inline` so that if `bit` is comptime-known, the instruction
+        /// can be lowered to a more efficient machine code instruction if
+        /// possible.
+        pub inline fn bitSet(self: *Self, bit: Bit, comptime order: AtomicOrder) u1 {
+            const mask = @as(T, 1) << bit;
+            const value = self.fetchOr(mask, order);
+            return @intFromBool(value & mask != 0);
+        }
+
+        /// Marked `inline` so that if `bit` is comptime-known, the instruction
+        /// can be lowered to a more efficient machine code instruction if
+        /// possible.
+        pub inline fn bitReset(self: *Self, bit: Bit, comptime order: AtomicOrder) u1 {
+            const mask = @as(T, 1) << bit;
+            const value = self.fetchAnd(~mask, order);
+            return @intFromBool(value & mask != 0);
+        }
+
+        /// Marked `inline` so that if `bit` is comptime-known, the instruction
+        /// can be lowered to a more efficient machine code instruction if
+        /// possible.
+        pub inline fn bitToggle(self: *Self, bit: Bit, comptime order: AtomicOrder) u1 {
+            const mask = @as(T, 1) << bit;
+            const value = self.fetchXor(mask, order);
+            return @intFromBool(value & mask != 0);
+        }
+    };
+}
+'''
+);

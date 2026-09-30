@@ -1,0 +1,45 @@
+const Mem = import("../../Mem.func");
+const Net = import("../Net.func");
+const String = import("../../datatype/String.func");
+
+code(
+'''
+const std = @import("std");
+
+pub const Stream = Net.Stream;
+pub const Reader = Stream.Reader;
+pub const Writer = Stream.Writer;
+pub const ConnectOptions = Net.IpAddress.ConnectOptions;
+'''
+);
+
+mem: *Mem,
+address: Net.IpAddress,
+io: std.Io,
+stream: Stream,
+
+pub fn a(mem: *Mem, address: Net.IpAddress) !TcpClient {
+    const io = mem.io();
+    const stream = try address.connect(io, .{ .mode = .stream });
+
+    return TcpClient{.mem=mem, .address=address, .io=io, .stream=stream};
+}
+/// TcpClient will be freed by caller.
+pub fn d(self: *TcpClient) void {
+    self.stream.close(self.io);
+    self.* = undefined;
+}
+
+pub fn receive(self: *TcpClient) ![]u8 {
+    var buffer: [1024]u8 = undefined;
+    var reader = self.stream.reader(self.io, &buffer);
+    const response = try reader.interface.takeDelimiterInclusive('\n');
+    return try String.copyStr(self.mem, String.trimStr(response));
+}
+
+pub fn send(self: *TcpClient, message: str) !void {
+    var buffer: [1024]u8 = undefined;
+    var writer = self.stream.writer(self.io, &buffer);
+    try writer.interface.writeAll(message);
+    try writer.interface.flush();
+}

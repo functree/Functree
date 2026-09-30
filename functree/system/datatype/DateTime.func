@@ -1,0 +1,1165 @@
+pub const Date = import("Date.func");
+
+const Mem = import("../Mem.func");
+const DataType = import("../DataType.func");
+const Math = import("../Math.func");
+
+code(
+'''
+const std = @import("std");
+'''
+);
+
+year: i32,        // y
+month: u8,        // m
+day: u8,          // d
+hour: u8,         // h
+minute: u8,       // i
+second: u8,       // s
+millisecond: i16, // l
+microsecond: i32, // u
+nanosecond: i32,  // n
+timezone: TimeZone = .utc0, // default UTC-0
+
+pub fn a(year: i32, month: u8, day: u8, hour: u8, minute: u8, second: u8, millisecond: i16, microsecond: i32, nanosecond: i32) !DateTime {
+    if (!DateTime.valid(year, month, day, hour, minute, second, millisecond, microsecond, nanosecond)) {
+        return Error.invalidTime;
+    }
+
+    return DateTime{
+        .year = year,
+        .month = month,
+        .day = day,
+        .hour = hour,
+        .minute = minute,
+        .second = second,
+        .millisecond = millisecond,
+        .microsecond = microsecond,
+        .nanosecond = nanosecond,
+    };
+}
+pub fn a2(year: i32, month: u8, day: u8, hour: u8, minute: u8, second: u8, millisecond: i16, microsecond: i32, nanosecond: i32, _timezone: TimeZone) !DateTime {
+    if (!DateTime.valid(year, month, day, hour, minute, second, millisecond, microsecond, nanosecond)) {
+        return Error.invalidTime;
+    }
+
+    return DateTime{
+        .year = year,
+        .month = month,
+        .day = day,
+        .hour = hour,
+        .minute = minute,
+        .second = second,
+        .millisecond = millisecond,
+        .microsecond = microsecond,
+        .nanosecond = nanosecond,
+        .timezone = _timezone,
+    };
+}
+
+pub fn addYear(self: *DateTime, count: i32) void {
+    self.year = self.year + count;
+}
+pub fn addMonth(self: *DateTime, count: i32) void {
+    var month_count = count;
+    if (month_count >= 0) {
+        while (self.month + month_count >= 12) {
+            self.year = self.year + 1;
+            month_count = month_count - (12 - self.month + 1);
+            self.month = 1;
+        }
+        self.month = self.month + DataType.intCast(u8, month_count);
+    } else {
+        while (self.month + month_count < 1) {
+            self.year = self.year - 1;
+            month_count = month_count + self.month;
+            self.month = 12;
+        }
+        self.month = self.month - DataType.intCast(u8, month_count * -1);
+    }
+}
+pub fn addDay(self: *DateTime, count: i32) void {
+    var day_count = count;
+    if (day_count >= 0) {
+        var max_days = Date.daysInMonth(self.year, self.month);
+        while (self.day + day_count > max_days) {
+            day_count = day_count - (max_days - self.day + 1);
+            self.day = 1;
+            self.addMonth(1);
+            max_days = Date.daysInMonth(self.year, self.month);
+        }
+        self.day = self.day + DataType.intCast(u8, day_count);
+    } else {
+        var max_days: u8 = undefined;
+        while (self.day + day_count < 1) {
+            day_count = day_count + self.day;
+            self.addMonth(-1);
+            max_days = Date.daysInMonth(self.year, self.month);
+            self.day = max_days;
+        }
+        self.day = self.day - DataType.intCast(u8, day_count * -1);
+    }
+}
+pub fn addHour(self: *DateTime, count: i32) void {
+    var hour_count = count;
+    if (hour_count >= 0) {
+        while (self.hour + hour_count >= 24) {
+            hour_count = hour_count - (24 - self.hour);
+            self.hour = 0;
+            self.addDay(1);
+        }
+        self.hour = self.hour + DataType.intCast(u8, hour_count);
+    } else {
+        while (self.hour + hour_count < 0) {
+            hour_count = hour_count + self.hour;
+            self.addDay(-1);
+            self.hour = 24;
+        }
+        self.hour = self.hour - DataType.intCast(u8, hour_count * -1);
+    }
+}
+pub fn addMinute(self: *DateTime, count: i32) void {
+    var minute_count = count;
+    if (minute_count >= 0) {
+        while (self.minute + minute_count >= 60) {
+            minute_count = minute_count - (60 - self.minute);
+            self.minute = 0;
+            self.addHour(1);
+        }
+        self.minute = self.minute + DataType.intCast(u8, minute_count);
+    } else {
+        while (self.minute + minute_count < 0) {
+            minute_count = minute_count + self.minute;
+            self.addHour(-1);
+            self.minute = 60;
+        }
+        self.minute = self.minute - DataType.intCast(u8, minute_count * -1);
+    }
+}
+pub fn addSecond(self: *DateTime, count: i32) void {
+    var second_count = count;
+    if (second_count >= 0) {
+        while (self.second + second_count >= 60) {
+            second_count = second_count - (60 - self.second);
+            self.second = 0;
+            self.addMinute(1);
+        }
+        self.second = self.second + DataType.intCast(u8, second_count);
+    } else {
+        while (self.second + second_count < 0) {
+            second_count = second_count + self.second;
+            self.addMinute(-1);
+            self.second = 60;
+        }
+        self.second = self.second - DataType.intCast(u8, second_count * -1);
+    }
+}
+pub fn addMillisecond(self: *DateTime, count: i32) void {
+    var millisecond_count = count;
+    if (millisecond_count >= 0) {
+        while (self.millisecond + millisecond_count >= 1000) {
+            millisecond_count = millisecond_count - (1000 - self.millisecond);
+            self.millisecond = 0;
+            self.addSecond(1);
+        }
+        self.millisecond = self.millisecond + DataType.intCast(i16, millisecond_count);
+    } else {
+        while (self.millisecond + millisecond_count < 0) {
+            millisecond_count = millisecond_count + self.millisecond;
+            self.addSecond(-1);
+            self.millisecond = 1000;
+        }
+        self.millisecond = self.millisecond - DataType.intCast(i16, millisecond_count * -1);
+    }
+}
+
+pub fn compare(self: DateTime, value: DateTime) i8 {
+    if (self.year > value.year) {
+        return 1;
+    } else if (self.year < value.year) {
+        return -1;
+    }
+    if (self.month > value.month) {
+        return 1;
+    } else if (self.month < value.month) {
+        return -1;
+    }
+    if (self.day > value.day) {
+        return 1;
+    } else if (self.day < value.day) {
+        return -1;
+    }
+    if (self.hour > value.hour) {
+        return 1;
+    } else if (self.hour < value.hour) {
+        return -1;
+    }
+    if (self.minute > value.minute) {
+        return 1;
+    } else if (self.minute < value.minute) {
+        return -1;
+    }
+    if (self.second > value.second) {
+        return 1;
+    } else if (self.second < value.second) {
+        return -1;
+    }
+    if (self.millisecond > value.millisecond) {
+        return 1;
+    } else if (self.millisecond < value.millisecond) {
+        return -1;
+    }
+    if (self.microsecond > value.microsecond) {
+        return 1;
+    } else if (self.microsecond < value.microsecond) {
+        return -1;
+    }
+    if (self.nanosecond > value.nanosecond) {
+        return 1;
+    } else if (self.nanosecond < value.nanosecond) {
+        return -1;
+    }
+    const self_timezone = DataType.intFromEnum(i8, self.timezone);
+    const value_timezone = DataType.intFromEnum(i8, value.timezone);
+    if (self_timezone > value_timezone) {
+        return 1;
+    } else if (self_timezone < value_timezone) {
+        return -1;
+    }
+
+    return 0;
+}
+
+pub fn equal(self: DateTime, value: DateTime) bool {
+    if (self.year != value.year) {
+        return false;
+    }
+    if (self.month != value.month) {
+        return false;
+    }
+    if (self.day != value.day) {
+        return false;
+    }
+    if (self.hour != value.hour) {
+        return false;
+    }
+    if (self.minute != value.minute) {
+        return false;
+    }
+    if (self.second != value.second) {
+        return false;
+    }
+    if (self.millisecond != value.millisecond) {
+        return false;
+    }
+    if (self.microsecond != value.microsecond) {
+        return false;
+    }
+    if (self.nanosecond != value.nanosecond) {
+        return false;
+    }
+    if (self.timezone != value.timezone) {
+        return false;
+    }
+
+    return true;
+}
+
+
+///defaut format: y-m-d h:i:s
+pub fn parse(value: str) !DateTime {
+    return try parse2(value, "y-m-d h:i:s");
+}
+
+///format: 'y-m-d h:i:s.l' or 'y-m-d h:i:s.u' or 'y-m-d h:i:s.n' or 'y-mm-dd hh:ii:ss.ll' or 'y-mm-dd hh:ii:ss.uu' or 'y-mm-dd hh:ii:ss.nn'
+pub fn parse2(value: str, format: str) !DateTime {
+    var str_index: usize = 0;
+    var format_index: usize = 0;
+
+    var year: i32 = undefined;
+    var month: u8 = undefined;
+    var day: u8 = undefined;
+    var hour: u8 = undefined;
+    var minute: u8 = undefined;
+    var second: u8 = undefined;
+    var millisecond: i16 = -1;
+    var microsecond: i32 = -1;
+    var nanosecond: i32 = -1;
+
+    while (format_index < format.len) {
+        const c = format[format_index];
+
+        if (c == 'y') {
+            if (format_index+1 < format.len and format[format_index+1] == 'y') {
+                return Error.invalidYearFormat;
+            }
+            const start = str_index;
+            var is_negative: bool = false;
+            if (start > 0 and value[start-1] == '-') {
+                is_negative = true;
+            }
+            while (str_index < value.len) {
+                if (value[str_index] < '0' or value[str_index] > '9') {
+                    break;
+                }
+                str_index += 1;
+            }
+            year = try std.fmt.parseInt(i32, value[start..str_index], 10);
+            if (is_negative) {
+                year = -year;
+            }
+            format_index += 1;
+        } else if (c == 'm') {
+            if (format_index+2 < format.len and format[format_index+2] == 'm') {
+                return Error.invalidMonthFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'm') { //01,12
+                format_index += 2;
+            } else { //1,12
+                format_index += 1;
+            }
+            var start = str_index;
+            while (str_index < value.len) {
+                if (value[str_index] < '0' or value[str_index] > '9') {
+                    break;
+                }
+                if (str_index == start and value[str_index] == '0') {
+                    str_index += 1;
+                    start = str_index;
+                    continue;
+                }
+                str_index += 1;
+            }
+            month = try std.fmt.parseInt(u8, value[start..str_index], 10);
+        } else if (c == 'd') {
+            if (format_index+2 < format.len and format[format_index+2] == 'd') {
+                return Error.invalidDayFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'd') { //01,31
+                format_index += 2;
+            } else { //1,31
+                format_index += 1;
+            }
+            var start = str_index;
+            while (str_index < value.len) {
+                if (value[str_index] < '0' or value[str_index] > '9') {
+                    break;
+                }
+                if (str_index == start and value[str_index] == '0') {
+                    str_index += 1;
+                    start = str_index;
+                    continue;
+                }
+                str_index += 1;
+            }
+            day = try std.fmt.parseInt(u8, value[start..str_index], 10);
+        } else if (c == 'h') {
+            if (format_index+2 < format.len and format[format_index+2] == 'h') {
+                return Error.invalidTimeFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'h') { //01,23
+                format_index += 2;
+            } else { //1,23
+                format_index += 1;
+            }
+            var start = str_index;
+            while (str_index < value.len) {
+                if (value[str_index] < '0' or value[str_index] > '9') {
+                    break;
+                }
+                if (str_index == start and value[str_index] == '0') {
+                    str_index += 1;
+                    start = str_index;
+                    continue;
+                }
+                str_index += 1;
+            }
+            hour = try std.fmt.parseInt(u8, value[start..str_index], 10);
+        } else if (c == 'i') {
+            if (format_index+2 < format.len and format[format_index+2] == 'i') {
+                return Error.invalidTimeFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'i') { //01,59
+                format_index += 2;
+            } else { //1,59
+                format_index += 1;
+            }
+            var start = str_index;
+            while (str_index < value.len) {
+                if (value[str_index] < '0' or value[str_index] > '9') {
+                    break;
+                }
+                if (str_index == start and value[str_index] == '0') {
+                    str_index += 1;
+                    start = str_index;
+                    continue;
+                }
+                str_index += 1;
+            }
+            minute = try std.fmt.parseInt(u8, value[start..str_index], 10);
+        } else if (c == 's') {
+            if (format_index+2 < format.len and format[format_index+2] == 's') {
+                return Error.invalidTimeFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 's') { //01,59
+                format_index += 2;
+            } else { //1,59
+                format_index += 1;
+            }
+            var start = str_index;
+            while (str_index < value.len) {
+                if (value[str_index] < '0' or value[str_index] > '9') {
+                    break;
+                }
+                if (str_index == start and value[str_index] == '0') {
+                    str_index += 1;
+                    start = str_index;
+                    continue;
+                }
+                str_index += 1;
+            }
+            second = try std.fmt.parseInt(u8, value[start..str_index], 10);
+        } else if (c == 'l') {
+            if (format_index+2 < format.len and format[format_index+2] == 'l') {
+                return Error.invalidTimeFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'l') { //001,023,999
+                format_index += 2;
+            } else { //001,023,999
+                format_index += 1;
+            }
+            var start = str_index;
+            while (str_index < value.len) {
+                if (value[str_index] < '0' or value[str_index] > '9') {
+                    break;
+                }
+                if (str_index == start and value[str_index] == '0') {
+                    str_index += 1;
+                    start = str_index;
+                    continue;
+                }
+                str_index += 1;
+            }
+            millisecond = try std.fmt.parseInt(i16, value[start..str_index], 10);
+        } else if (c == 'u') {
+            if (format_index+2 < format.len and format[format_index+2] == 'u') {
+                return Error.invalidTimeFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'u') { //000001,999999
+                format_index += 2;
+            } else { //000001,999999
+                format_index += 1;
+            }
+            var start = str_index;
+            while (str_index < value.len) {
+                if (value[str_index] < '0' or value[str_index] > '9') {
+                    break;
+                }
+                if (str_index == start and value[str_index] == '0') {
+                    str_index += 1;
+                    start = str_index;
+                    continue;
+                }
+                str_index += 1;
+            }
+            microsecond = try std.fmt.parseInt(i32, value[start..str_index], 10);
+        } else if (c == 'n') {
+            if (format_index+2 < format.len and format[format_index+2] == 'n') {
+                return Error.invalidTimeFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'n') { //000000001,999999999
+                format_index += 2;
+            } else { //000000001,999999999
+                format_index += 1;
+            }
+            var start = str_index;
+            while (str_index < value.len) {
+                if (value[str_index] < '0' or value[str_index] > '9') {
+                    break;
+                }
+                if (str_index == start and value[str_index] == '0') {
+                    str_index += 1;
+                    start = str_index;
+                    continue;
+                }
+                str_index += 1;
+            }
+            nanosecond = try std.fmt.parseInt(i32, value[start..str_index], 10);
+        } else {
+            while (str_index < value.len) {
+                if (value[str_index] < '0' or value[str_index] > '9') {
+                    str_index += 1;
+                    break;
+                }
+                str_index += 1;
+            }
+            format_index += 1;
+        }
+    }
+
+    return DateTime.a(year, month, day, hour, minute, second, millisecond, microsecond, nanosecond);
+}
+
+pub fn setTimezone(self: *DateTime, _timezone: TimeZone) void {
+    const hours = DataType.intFromEnum(i32, _timezone);
+    self.addHour(hours);
+    self.timezone = _timezone;
+}
+
+///default format: y-mm-dd hh:ii:ss
+pub fn toStr(self: DateTime, buffer: []u8) []u8 {
+    var count: usize = 19;
+    var buf: []u8 = undefined;
+
+    if (self.year < 0) {
+        _ = std.fmt.bufPrint(buffer, "{:0>5}", .{ self.year }) catch unreachable;
+        buf = buffer[5..];
+        count = 20;
+    } else {
+        _ = std.fmt.bufPrint(buffer, "{:0>4}", .{ DataType.intCast(u32, self.year) }) catch unreachable;
+        buf = buffer[4..];
+    }
+
+    buf[0] = '-';
+    buf[1..3].* = digit2str(self.month);
+    buf[3] = '-';
+    buf[4..6].* = digit2str(self.day);
+    buf[6] = ' ';
+    buf[7..9].* = digit2str(self.hour);
+    buf[9] = ':';
+    buf[10..12].* = digit2str(self.minute);
+    buf[12] = ':';
+    buf[13..15].* = digit2str(self.second);
+
+    return buffer[0..count];
+}
+
+///format: 'y-m-d h:i:s.l' or 'y-m-d h:i:s.u' or 'y-m-d h:i:s.n' or 'y-mm-dd hh:ii:ss.ll' or 'y-mm-dd hh:ii:ss.uu' or 'y-mm-dd hh:ii:ss.nn'
+pub fn toStr2(self: DateTime, buffer: []u8, format: str) ![]u8 {
+    var count: usize = 0;
+    var format_index: usize = 0;
+    const zerostr = "000000000";
+    while (format_index < format.len) {
+        const c = format[format_index];
+
+        if (c == 'y') {
+            if (format_index+1 < format.len and format[format_index+1] == 'y') {
+                return Error.invalidYearFormat;
+            }
+            if (self.year < 0) {
+                _ = std.fmt.bufPrint(buffer[count..], "{:0>5}", .{ self.year }) catch unreachable;
+                count += 1;
+            } else {
+                _ = std.fmt.bufPrint(buffer[count..], "{:0>4}", .{ DataType.intCast(u32, self.year) }) catch unreachable;
+            }
+            format_index += 1;
+            count += 4;
+        } else if (c == 'm') {
+            if (format_index+2 < format.len and format[format_index+2] == 'm') {
+                return Error.invalidMonthFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'm') { //01,12
+                Mem.copy(buffer[count..count+2], digit2str(self.month)[0..]);
+                format_index += 2;
+                count += 2;
+            } else { //1,12
+                if (self.month >= 10) {
+                    Mem.copy(buffer[count..count+2], digit2str(self.month)[0..]);
+                    count += 2;
+                } else {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:1}", .{ self.month }) catch unreachable;
+                    count += 1;
+                }
+                format_index += 1;
+            }
+        } else if (c == 'd') {
+            if (format_index+2 < format.len and format[format_index+2] == 'd') {
+                return Error.invalidDayFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'd') { //01,31
+                Mem.copy(buffer[count..count+2], digit2str(self.day)[0..]);
+                format_index += 2;
+                count += 2;
+            } else { //1,31
+                if (self.day >= 10) {
+                    Mem.copy(buffer[count..count+2], digit2str(self.day)[0..]);
+                    count += 2;
+                } else {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:1}", .{ self.day }) catch unreachable;
+                    count += 1;
+                }
+                format_index += 1;
+            }
+        } else if (c == 'h') {
+            if (format_index+2 < format.len and format[format_index+2] == 'h') {
+                return Error.invalidDayFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'h') { //01,59
+                Mem.copy(buffer[count..count+2], digit2str(self.hour)[0..]);
+                format_index += 2;
+                count += 2;
+            } else { //1,59
+                if (self.hour >= 10) {
+                    Mem.copy(buffer[count..count+2], digit2str(self.hour)[0..]);
+                    count += 2;
+                } else {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:1}", .{ self.hour }) catch unreachable;
+                    count += 1;
+                }
+                format_index += 1;
+            }
+        } else if (c == 'i') {
+            if (format_index+2 < format.len and format[format_index+2] == 'i') {
+                return Error.invalidDayFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'i') { //01,59
+                Mem.copy(buffer[count..count+2], digit2str(self.minute)[0..]);
+                format_index += 2;
+                count += 2;
+            } else { //1,59
+                if (self.minute >= 10) {
+                    Mem.copy(buffer[count..count+2], digit2str(self.minute)[0..]);
+                    count += 2;
+                } else {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:1}", .{ self.minute }) catch unreachable;
+                    count += 1;
+                }
+                format_index += 1;
+            }
+        } else if (c == 's') {
+            if (format_index+2 < format.len and format[format_index+2] == 's') {
+                return Error.invalidDayFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 's') { //01,59
+                Mem.copy(buffer[count..count+2], digit2str(self.second)[0..]);
+                format_index += 2;
+                count += 2;
+            } else { //1,59
+                if (self.second >= 10) {
+                    Mem.copy(buffer[count..count+2], digit2str(self.second)[0..]);
+                    count += 2;
+                } else {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:1}", .{ self.second }) catch unreachable;
+                    count += 1;
+                }
+                format_index += 1;
+            }
+        } else if (c == 'l') {
+            if (format_index+2 < format.len and format[format_index+2] == 'l') {
+                return Error.invalidTimeFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'l') { //001,999
+                if (self.millisecond < 10) {
+                    Mem.copy(buffer[count..count+2], zerostr[0..2]);
+                    _ = std.fmt.bufPrint(buffer[count+2..], "{:1}", .{ DataType.intCast(u8, self.millisecond) }) catch unreachable;
+                } else if (self.millisecond < 100) {
+                    Mem.copy(buffer[count..count+1], zerostr[0..1]);
+                    _ = std.fmt.bufPrint(buffer[count+1..], "{:2}", .{ DataType.intCast(u16, self.millisecond) }) catch unreachable;
+                } else {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:3}", .{ DataType.intCast(u16, self.millisecond) }) catch unreachable;
+                }
+                format_index += 2;
+                count += 3;
+            } else { //1,999
+                if (self.millisecond >= 100) {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:3}", .{ DataType.intCast(u16, self.millisecond) }) catch unreachable;
+                    count += 3;
+                } else if (self.millisecond >= 10) {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:2}", .{ DataType.intCast(u16, self.millisecond) }) catch unreachable;
+                    count += 2;
+                } else {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:1}", .{ DataType.intCast(u8, self.millisecond) }) catch unreachable;
+                    count += 1;
+                }
+                format_index += 1;
+            }
+        } else if (c == 'u') {
+            if (format_index+2 < format.len and format[format_index+2] == 'u') {
+                return Error.invalidTimeFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'u') { //000001,999999
+                if (self.microsecond < 10) {
+                    Mem.copy(buffer[count..count+5], zerostr[0..5]);
+                    _ = std.fmt.bufPrint(buffer[count+5..], "{:1}", .{ DataType.intCast(u8, self.microsecond) }) catch unreachable;
+                } else if (self.microsecond < 100) {
+                    Mem.copy(buffer[count..count+4], zerostr[0..4]);
+                    _ = std.fmt.bufPrint(buffer[count+4..], "{:2}", .{ DataType.intCast(u16, self.microsecond) }) catch unreachable;
+                } else if (self.microsecond < 1000) {
+                    Mem.copy(buffer[count..count+3], zerostr[0..3]);
+                    _ = std.fmt.bufPrint(buffer[count+3..], "{:3}", .{ DataType.intCast(u16, self.microsecond) }) catch unreachable;
+                } else if (self.microsecond < 10000) {
+                    Mem.copy(buffer[count..count+2], zerostr[0..2]);
+                    _ = std.fmt.bufPrint(buffer[count+2..], "{:4}", .{ DataType.intCast(u16, self.microsecond) }) catch unreachable;
+                } else if (self.microsecond < 100000) {
+                    Mem.copy(buffer[count..count+1], zerostr[0..1]);
+                    _ = std.fmt.bufPrint(buffer[count+1..], "{:5}", .{ DataType.intCast(u32, self.microsecond) }) catch unreachable;
+                } else {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:6}", .{ DataType.intCast(u32, self.microsecond) }) catch unreachable;
+                }
+                format_index += 2;
+                count += 6;
+            } else { //1,999999
+                if (self.microsecond >= 100000) {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:6}", .{ DataType.intCast(u32, self.microsecond) }) catch unreachable;
+                    count += 6;
+                } else if (self.microsecond >= 10000) {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:5}", .{ DataType.intCast(u32, self.microsecond) }) catch unreachable;
+                    count += 5;
+                } else if (self.microsecond >= 1000) {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:4}", .{ DataType.intCast(u16, self.microsecond) }) catch unreachable;
+                    count += 4;
+                } else if (self.microsecond >= 100) {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:3}", .{ DataType.intCast(u16, self.microsecond) }) catch unreachable;
+                    count += 3;
+                } else if (self.microsecond >= 10) {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:2}", .{ DataType.intCast(u16, self.microsecond) }) catch unreachable;
+                    count += 2;
+                } else {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:1}", .{ DataType.intCast(u8, self.microsecond) }) catch unreachable;
+                    count += 1;
+                }
+                format_index += 1;
+            }
+        } else if (c == 'n') {
+            if (format_index+2 < format.len and format[format_index+2] == 'n') {
+                return Error.invalidTimeFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'n') { //000000001,999999999
+                if (self.nanosecond < 10) {
+                    Mem.copy(buffer[count..count+8], zerostr[0..8]);
+                    _ = std.fmt.bufPrint(buffer[count+8..], "{:1}", .{ DataType.intCast(u8, self.nanosecond) }) catch unreachable;
+                } else if (self.nanosecond < 100) {
+                    Mem.copy(buffer[count..count+7], zerostr[0..7]);
+                    _ = std.fmt.bufPrint(buffer[count+7..], "{:2}", .{ DataType.intCast(u16, self.nanosecond) }) catch unreachable;
+                } else if (self.nanosecond < 1000) {
+                    Mem.copy(buffer[count..count+6], zerostr[0..6]);
+                    _ = std.fmt.bufPrint(buffer[count+6..], "{:3}", .{ DataType.intCast(u16, self.nanosecond) }) catch unreachable;
+                } else if (self.nanosecond < 10000) {
+                    Mem.copy(buffer[count..count+5], zerostr[0..5]);
+                    _ = std.fmt.bufPrint(buffer[count+5..], "{:4}", .{ DataType.intCast(u16, self.nanosecond) }) catch unreachable;
+                } else if (self.nanosecond < 100000) {
+                    Mem.copy(buffer[count..count+4], zerostr[0..4]);
+                    _ = std.fmt.bufPrint(buffer[count+4..], "{:5}", .{ DataType.intCast(u32, self.nanosecond) }) catch unreachable;
+                } else if (self.nanosecond < 1000000) {
+                    Mem.copy(buffer[count..count+3], zerostr[0..3]);
+                    _ = std.fmt.bufPrint(buffer[count+3..], "{:6}", .{ DataType.intCast(u32, self.nanosecond) }) catch unreachable;
+                } else if (self.nanosecond < 10000000) {
+                    Mem.copy(buffer[count..count+2], zerostr[0..2]);
+                    _ = std.fmt.bufPrint(buffer[count+2..], "{:7}", .{ DataType.intCast(u32, self.nanosecond) }) catch unreachable;
+                } else if (self.nanosecond < 100000000) {
+                    Mem.copy(buffer[count..count+1], zerostr[0..1]);
+                    _ = std.fmt.bufPrint(buffer[count+1..], "{:8}", .{ DataType.intCast(u32, self.nanosecond) }) catch unreachable;
+                } else {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:9}", .{ DataType.intCast(u32, self.nanosecond) }) catch unreachable;
+                }
+                format_index += 2;
+                count += 9;
+            } else { //1,999999999
+                if (self.nanosecond >= 100000000) {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:9}", .{ DataType.intCast(u32, self.nanosecond) }) catch unreachable;
+                    count += 9;
+                } else if (self.nanosecond >= 10000000) {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:8}", .{ DataType.intCast(u32, self.nanosecond) }) catch unreachable;
+                    count += 8;
+                } else if (self.nanosecond >= 1000000) {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:7}", .{ DataType.intCast(u32, self.nanosecond) }) catch unreachable;
+                    count += 7;
+                } else if (self.nanosecond >= 100000) {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:6}", .{ DataType.intCast(u32, self.nanosecond) }) catch unreachable;
+                    count += 6;
+                } else if (self.nanosecond >= 10000) {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:5}", .{ DataType.intCast(u32, self.nanosecond) }) catch unreachable;
+                    count += 5;
+                } else if (self.nanosecond >= 1000) {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:4}", .{ DataType.intCast(u16, self.nanosecond) }) catch unreachable;
+                    count += 4;
+                } else if (self.nanosecond >= 100) {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:3}", .{ DataType.intCast(u16, self.nanosecond) }) catch unreachable;
+                    count += 3;
+                } else if (self.nanosecond >= 10) {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:2}", .{ DataType.intCast(u16, self.nanosecond) }) catch unreachable;
+                    count += 2;
+                } else {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:1}", .{ DataType.intCast(u8, self.nanosecond) }) catch unreachable;
+                    count += 1;
+                }
+                format_index += 1;
+            }
+        } else {
+            buffer[count] = c;
+            format_index += 1;
+            count += 1;
+        }
+    }
+
+    return buffer[0..count];
+}
+
+/// calculate time interval between 2 DateTime, result in TimeInterval.
+pub fn timeInterval(self: DateTime, value: DateTime) !TimeInterval {
+    var days: u32 = 0;
+    var hours: u32 = 0;
+    var minutes: u32 = 0;
+    var seconds: u32 = 0;
+    var milliseconds: u32 = 0;
+
+    var total_days: f64 = 0;
+    var total_hours: f64 = 0;
+    var total_minutes: f64 = 0;
+    var total_seconds: f64 = 0;
+    var total_milliseconds: f64 = 0;
+
+    const result = self.compare(value);
+    if (result != 0) {
+        //in milliseconds
+        var self_timestamp: i64 = undefined;
+        var value_timestamp: i64 = undefined;
+        if (self.microsecond > -1 or value.microsecond > -1) {
+            self_timestamp = try Math.divTrunc(i64, try self.toMicroTimestamp(), us_per_ms);
+            value_timestamp = try Math.divTrunc(i64, try value.toMicroTimestamp(), us_per_ms);
+        } else if (self.millisecond > -1 or value.millisecond > -1) {
+            self_timestamp = try self.toMilliTimestamp();
+            value_timestamp = try value.toMilliTimestamp();
+        } else {
+            self_timestamp = self.toTimestamp() * ms_per_s;
+            value_timestamp = value.toTimestamp() * ms_per_s;
+        }
+
+        const interval_milliseconds: u32 = DataType.intCast(u32, Math.abs2(u64, self_timestamp - value_timestamp));
+
+        days = try Math.divFloor(u32, interval_milliseconds, ms_per_day);
+        var remaining_milliseconds = interval_milliseconds % ms_per_day;
+        hours = try Math.divFloor(u32, remaining_milliseconds, ms_per_hour);
+        remaining_milliseconds = remaining_milliseconds % ms_per_hour;
+        minutes = try Math.divFloor(u32, remaining_milliseconds, ms_per_min);
+        remaining_milliseconds = remaining_milliseconds % ms_per_min;
+        seconds = try Math.divFloor(u32, remaining_milliseconds, ms_per_s);
+        milliseconds = remaining_milliseconds % ms_per_s;
+
+        const interval_float: f64 = DataType.floatFromInt(f64, interval_milliseconds);
+        total_days = interval_float / ms_per_day;
+        total_hours = interval_float / ms_per_hour;
+        total_minutes = interval_float / ms_per_min;
+        total_seconds = interval_float / ms_per_s;
+        total_milliseconds = interval_float;
+    }
+
+    return TimeInterval{
+        .days = days,
+        .hours = hours,
+        .minutes = minutes,
+        .seconds = seconds,
+        .milliseconds = milliseconds,
+
+        .total_days = total_days,
+        .total_hours = total_hours,
+        .total_minutes = total_minutes,
+        .total_seconds = total_seconds,
+        .total_milliseconds = total_milliseconds,
+    };
+}
+
+/// convert DateTime(after 1970) to timestamp, in seconds.
+pub fn toTimestamp(self: DateTime) i64 {
+    var total_days: i64 = 0;
+    var year: i32 = 1970;
+    while (year < self.year) {
+        total_days = total_days + Date.daysInYear(year);
+        year = year + 1;
+    }
+
+    var month: u8 = 1;
+    while (month < self.month) {
+        total_days = total_days + Date.daysInMonth(self.year, month);
+        month = month + 1;
+    }
+
+    total_days = total_days + self.day - 1;
+    const hour: u32  = self.hour;
+    const minute: u16  = self.minute;
+
+    const total_seconds = total_days * s_per_day + hour * s_per_hour + minute * s_per_min + self.second;
+
+    return total_seconds;
+}
+/// convert DateTime(after 1970) to milliTimestamp, in milliseconds.
+pub fn toMilliTimestamp(self: DateTime) !i64 {
+    var total_milliseconds = self.toTimestamp() * ms_per_s;
+
+    if (self.millisecond > -1) {
+        total_milliseconds = total_milliseconds + self.millisecond;
+    } else if (self.microsecond > -1) {
+        total_milliseconds = total_milliseconds + try Math.divTrunc(i64, self.microsecond, us_per_ms);
+    } else if (self.nanosecond > -1) {
+        total_milliseconds = total_milliseconds + try Math.divTrunc(i64, self.nanosecond, ns_per_ms);
+    }
+
+    return total_milliseconds;
+}
+/// convert DateTime(after 1970) to microTimestamp, in microseconds.
+pub fn toMicroTimestamp(self: DateTime) !i64 {
+    var total_microseconds = self.toTimestamp() * us_per_s;
+
+    if (self.millisecond > -1) {
+        total_microseconds = total_microseconds + DataType.intCast(i32, self.millisecond) * us_per_ms;
+    } else if (self.microsecond > -1) {
+        total_microseconds = total_microseconds + self.microsecond;
+    } else if (self.nanosecond > -1) {
+        total_microseconds = total_microseconds + try Math.divTrunc(i64, self.nanosecond, ns_per_us);
+    }
+
+    return total_microseconds;
+}
+
+/// Get a calendar timestamp, in seconds, relative to UTC 1970-01-01
+pub fn timestamp() i64 {
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const stamp = std.Io.Clock.real.now(io);// std.Io.Timestamp.now(io, .awake);
+    return stamp.toSeconds();
+}
+
+/// Get a calendar timestamp, in milliseconds, relative to UTC 1970-01-01
+pub fn milliTimestamp() i64 {
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const stamp = std.Io.Clock.real.now(io);// std.Io.Timestamp.now(io, .awake);
+    return stamp.toMilliseconds();
+}
+
+/// Get a calendar timestamp, in microseconds, relative to UTC 1970-01-01
+pub fn microTimestamp() i64 {
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const stamp = std.Io.Clock.real.now(io);// std.Io.Timestamp.now(io, .awake);
+    return stamp.toMicroseconds();
+}
+
+/// Get a calendar timestamp, in nanoseconds, relative to UTC 1970-01-01
+pub fn nanoTimestamp() i128 {
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const stamp = std.Io.Clock.real.now(io);// std.Io.Timestamp.now(io, .awake);
+    return stamp.toNanoseconds();
+}
+
+/// Get a now DateTime, default in seconds.
+pub fn now() !DateTime {
+    return try timestampToDateTime(timestamp(), .second, .utc0);
+}
+/// Get a now DateTime, default in millisecond.
+pub fn now2() !DateTime {
+    return try timestampToDateTime(milliTimestamp(), .millisecond, .utc0);
+}
+/// Get a now DateTime, default in microsecond.
+pub fn now3() !DateTime {
+    return try timestampToDateTime(microTimestamp(), .microsecond, .utc0);
+}
+/// convert timestamp to DateTime.
+pub fn timestampToDateTime(value: i64, time_unit: TimeUnit, _timezone: ?TimeZone) !DateTime {
+    var year: i32 = undefined;
+    var month: u8 = undefined;
+    var day: u8 = undefined;
+    var hour: u8 = undefined;
+    var minute: u8 = undefined;
+    var second: u8 = undefined;
+    var millisecond: i16 = -1;
+    var microsecond: i32 = -1;
+    const nanosecond: i32 = -1;
+    var timezone: TimeZone = .utc0;
+    if (_timezone != null) {
+        timezone = _timezone.?;
+    }
+
+    var days_since_epoch: i64 = undefined;
+    var seconds_left: i64 = undefined;
+    if (time_unit == .second) {
+        days_since_epoch = try Math.divFloor(i64, value, s_per_day);
+        seconds_left = try Math.rem(i64, value, s_per_day);
+    } else if (time_unit == .millisecond) {
+        days_since_epoch = try Math.divFloor(i64, value, ms_per_day);
+        const milliseconds_left = try Math.rem(i64, value, ms_per_day);
+        seconds_left = try Math.divFloor(i64, milliseconds_left, ms_per_s);
+        millisecond = DataType.intCast(i16, try Math.rem(i64, milliseconds_left, ms_per_s));
+    } else if (time_unit == .microsecond) {
+        days_since_epoch = try Math.divFloor(i64, value, us_per_day);
+        const microseconds_left = try Math.rem(i64, value, us_per_day);
+        seconds_left = try Math.divFloor(i64, microseconds_left, us_per_s);
+        microsecond = DataType.intCast(i32, try Math.rem(i64, microseconds_left, us_per_s));
+    } else {
+        return Error.unsupportTimeUnit;
+    }
+
+    year = 1970;
+    while (days_since_epoch >= Date.daysInYear(year)) {
+        days_since_epoch -= Date.daysInYear(year);
+        year += 1;
+    }
+    month = 1;
+    while (days_since_epoch >= Date.daysInMonth(year, month)) {
+        days_since_epoch -= Date.daysInMonth(year, month);
+        month += 1;
+    }
+    day = DataType.intCast(u8, days_since_epoch) + 1;
+    hour = 0;
+    while (seconds_left >= s_per_hour) {
+        seconds_left -= s_per_hour;
+        hour += 1;
+    }
+    minute = 0;
+    while (seconds_left >= s_per_min) {
+        seconds_left -= s_per_min;
+        minute += 1;
+    }
+    second = DataType.intCast(u8, seconds_left);
+
+    return DateTime{
+        .year = year,
+        .month = month,
+        .day = day,
+        .hour = hour,
+        .minute = minute,
+        .second = second,
+        .millisecond = millisecond,
+        .microsecond = microsecond,
+        .nanosecond = nanosecond,
+        .timezone = timezone,
+    };
+}
+
+
+// Divisions of a nanosecond.
+pub const ns_per_us = 1000;
+pub const ns_per_ms = 1000 * ns_per_us;
+pub const ns_per_s = 1000 * ns_per_ms;
+pub const ns_per_min = 60 * ns_per_s;
+pub const ns_per_hour = 60 * ns_per_min;
+pub const ns_per_day = 24 * ns_per_hour;
+pub const ns_per_week = 7 * ns_per_day;
+
+// Divisions of a microsecond.
+pub const us_per_ms = 1000;
+pub const us_per_s = 1000 * us_per_ms;
+pub const us_per_min = 60 * us_per_s;
+pub const us_per_hour = 60 * us_per_min;
+pub const us_per_day = 24 * us_per_hour;
+pub const us_per_week = 7 * us_per_day;
+
+// Divisions of a millisecond.
+pub const ms_per_s = 1000;
+pub const ms_per_min = 60 * ms_per_s;
+pub const ms_per_hour = 60 * ms_per_min;
+pub const ms_per_day = 24 * ms_per_hour;
+pub const ms_per_week = 7 * ms_per_day;
+
+// Divisions of a second.
+pub const s_per_min = 60;
+pub const s_per_hour = s_per_min * 60;
+pub const s_per_day = s_per_hour * 24;
+pub const s_per_week = s_per_day * 7;
+
+pub fn valid(year: i32, month: u8, day: u8, hour: u8, minute: u8, second: u8, millisecond: i16, microsecond: i32, nanosecond: i32) bool {
+    if (!Date.valid(year, month, day)) {
+        return false;
+    }
+
+    if (!validTime(hour, minute, second, millisecond, microsecond, nanosecond)) {
+        return false;
+    }
+
+    return true;
+}
+pub fn validTime(hour: u8, minute: u8, second: u8, millisecond: i16, microsecond: i32, nanosecond: i32) bool {
+    if (hour > 23) {
+        return false;
+    }
+
+    if (minute > 59) {
+        return false;
+    }
+
+    if (second > 59) {
+        return false;
+    }
+
+    if (millisecond > 999) {
+        return false;
+    }
+
+    if (microsecond > 999999) {
+        return false;
+    }
+
+    if (nanosecond > 999999999) {
+        return false;
+    }
+
+    return true;
+}
+
+// Converts values in the range [0, 61) to a 2 string.
+pub fn digit2str(value: usize) [2]u8 {
+    return ("0001020304050607080910111213141516171819" ++
+        "2021222324252627282930313233343536373839" ++
+        "4041424344454647484950515253545556575859" ++
+        "60")[value * 2 ..][0..2].*;
+}
+
+pub const TimeUnit = enum{
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+    millisecond,
+    microsecond,
+    nanosecond,
+};
+pub const TimeInterval = func{
+    days: u32 = 0,
+    hours: u32 = 0,
+    minutes: u32 = 0,
+    seconds: u32 = 0,
+    milliseconds: u32 = 0,
+
+    total_days: f64 = 0,
+    total_hours: f64 = 0,
+    total_minutes: f64 = 0,
+    total_seconds: f64 = 0,
+    total_milliseconds: f64 = 0,
+};
+pub const TimeZone = enum(i8){
+    utc_12 = -12,
+    utc_11 = -11,
+    utc_10 = -10,
+    utc_9 = -9,
+    utc_8 = -8,
+    utc_7 = -7,
+    utc_6 = -6,
+    utc_5 = -5,
+    utc_4 = -4,
+    utc_3 = -3,
+    utc_2 = -2,
+    utc_1 = -1,
+    utc0 = 0,
+    utc1 = 1,
+    utc2 = 2,
+    utc3 = 3,
+    utc4 = 4,
+    utc5 = 5,
+    utc6 = 6,
+    utc7 = 7,
+    utc8 = 8,
+    utc9 = 9,
+    utc10 = 10,
+    utc11 = 11,
+    utc12 = 12,
+    utc13 = 13,
+    utc14 = 14,
+};
+pub const Error = error{
+    invalidDate,
+    invalidTime,
+    invalidYearFormat,
+    invalidMonthFormat,
+    invalidDayFormat,
+    invalidTimeFormat,
+    unsupportTimeUnit,
+};

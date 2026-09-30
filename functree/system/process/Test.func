@@ -1,0 +1,117 @@
+const Config = import("../../Config.func");
+const System = import("../../System.func");
+const Mem = System.Mem;
+const Io = System.Io;
+const Console = Io.Console;
+const DateTime = System.DataType.DateTime;
+
+const Process = System.Process;
+const Thread = Process.Thread;
+
+const FunctreeTest = import("../../Test.func");
+const expectEqual = FunctreeTest.expectEqual;
+const test_io = FunctreeTest.io;
+
+const ThreadContext = import("test/ThreadContext.func");
+test "Thread: setName, getName" {
+    if (Config.single_thread) return error.SkipZigTest;
+
+    var buffer: [10]u8 = undefined;
+    // var mem = Mem.as(&buffer);// init Stack memory
+    var mem = Mem.a();
+    // init StackFallbackHeap memory
+    mem.s(&buffer);
+    defer mem.d();
+
+    var context = ThreadContext{};
+    var thread = try Thread.a(&mem, ThreadContext.run, .{&context});
+    defer thread.d();
+    const io = thread.io;
+
+    context.thread = thread;
+    context.start_wait_event.set(io);
+    try context.test_done_event.wait(io);
+
+    try ThreadContext.testThreadName(&thread);
+
+    context.thread_done_event.set(io);
+    thread.sync();
+}
+
+fn worker(id: usize) void {
+    Console.print2("Thread {} working\n", .{id});
+}
+test "Thread: sync" {
+    if (Config.single_thread) return error.SkipZigTest;
+
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    var threads: [5]Thread = undefined;
+    for (0..5) |i| {
+        threads[i] = try Thread.a(&mem, worker, .{i});
+    }
+
+    for (threads) |thread| {
+        thread.sync();
+    }
+}
+
+fn testIncrementNotify(io: Io.StdIo, value: *usize, event: *Io.Event) void {
+    value.* += 1;
+    event.set(io);
+}
+test "Thread: async" {
+    if (Config.single_thread) return error.SkipZigTest;
+
+    // init stack memory
+    var buffer: [1024]u8 = undefined;
+    var mem = Mem.as(&buffer);
+    defer mem.d();
+
+    const io = test_io;
+    var value: usize = 0;
+    var event: Io.Event = .unset;
+
+    const thread = try Thread.a(&mem, testIncrementNotify, .{ io, &value, &event });
+    thread.async();
+
+    try event.wait(io);
+    try Test.expectEqual(value, 1);
+}
+
+const AtomicValue = Thread.AtomicValue;
+const Group = Thread.Group;
+
+var test_atomic_value = AtomicValue.t(u64).a(0);
+fn testAdd(add_num: u64) void {
+    _ = test_atomic_value.getAdd(add_num);
+}
+test "Group: a" {
+    if (Config.single_thread) return error.SkipZigTest;
+
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    // 创建一个并发组
+    var group = Group.a2(&mem, test_io);
+    defer group.d();
+
+    test_atomic_value.set(0);
+
+    var i: usize = 0;
+    // 发起多个请求
+    while (i < 50_000) {
+        group.async(testAdd, .{1});
+        i += 1;
+    }
+
+    // 等待所有请求完成
+    try group.wait();
+
+    try Test.expectEqual(50_000, test_atomic_value.get());
+}

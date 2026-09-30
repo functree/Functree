@@ -1,0 +1,41 @@
+code(
+'''
+const std = @import("std");
+
+const ResultType = enum {
+    value,
+    err,
+};
+
+pub fn t(comptime V: type, comptime E: type) type {
+    return union(ResultType) {
+        const Self = @This();
+        value: V,
+        err: E,
+
+        pub fn a() Self {
+            return Self{
+                .value = undefined,
+            };
+        }
+
+        /// putValue
+        pub fn v(self: *Self, value: V) void {
+            self.* = .{.value = value};
+        }
+        /// putErr
+        pub fn e(self: *Self, err: E) void {
+            self.* = .{.err = err};
+        }
+
+        pub fn ok(self: Self) bool {
+            switch (self) {
+                .value => return true,
+                .err => return false,
+            }
+            return false;
+        }
+    };
+}
+'''
+);

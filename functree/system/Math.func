@@ -1,0 +1,99 @@
+pub const Hash = import("math/Hash.func");
+pub const Random = import("math/Random.func");
+
+code(
+'''
+const std = @import("std");
+const math = std.math;
+
+// ── 数学 ──
+
+/// Returns the absolute value of an integer or a floating point number
+pub inline fn abs(value: anytype) @TypeOf(value) {
+    return @abs(value);
+}
+pub inline fn abs2(comptime T: type, value: anytype) T {
+    return @as(T, @abs(value));
+}
+pub inline fn sqrt(value: anytype) @TypeOf(value) {
+    return @sqrt(value);
+}
+pub inline fn min(value1: anytype, value2: anytype) @TypeOf(value1, value2) {
+    return @min(value1, value2);
+}
+pub inline fn max(value1: anytype, value2: anytype) @TypeOf(value1, value2) {
+    return @max(value1, value2);
+}
+pub inline fn mod(value1: anytype, value2: anytype) @TypeOf(value1, value2) {
+    return @mod(value1, value2);
+}
+/// Returns numerator modulo denominator, or an error if denominator is zero or negative
+pub inline fn mod2(comptime T: type, numerator: T, denominator: T) !T {
+    return try math.mod(T, numerator, denominator);
+}
+/// Returns value1 raised to the power of value2 (x^y)
+pub inline fn pow(comptime T: type, value1: T, value2: T) T {
+    return math.pow(T, value1, value2);
+}
+/// Returns the remainder when numerator is divided by denominator, or an error if denominator is zero or negative
+pub inline fn rem(comptime T: type, numerator: T, denominator: T) !T {
+    return try math.rem(T, numerator, denominator);
+}
+
+pub inline fn sin(value: anytype) @TypeOf(value) {
+    return @sin(value);
+}
+pub inline fn cos(value: anytype) @TypeOf(value) {
+    return @cos(value);
+}
+pub inline fn tan(value: anytype) @TypeOf(value) {
+    return @tan(value);
+}
+
+/// Returns the smallest integral value not less than the given floating point number
+pub inline fn ceil(value: anytype) @TypeOf(value) {
+    return @ceil(value);
+}
+/// Returns the largest integral value not greater than the given floating point number
+pub inline fn floor(value: anytype) @TypeOf(value) {
+    return @floor(value);
+}
+/// Rounds the given floating point number to an integer, away from zero
+pub inline fn round(value: anytype) @TypeOf(value) {
+    return @round(value);
+}
+/// Rounds the given floating point number to an integer, towards zero
+pub inline fn trunc(value: anytype) @TypeOf(value) {
+    return @trunc(value);
+}
+
+pub inline fn exp(value: anytype) @TypeOf(value) {
+    return @exp(value);
+}
+pub inline fn exp2(value: anytype) @TypeOf(value) {
+    return @exp2(value);
+}
+pub inline fn log(value: anytype) @TypeOf(value) {
+    return @log(value);
+}
+pub inline fn log2(value: anytype) @TypeOf(value) {
+    return @log2(value);
+}
+pub inline fn log10(value: anytype) @TypeOf(value) {
+    return std.math.log10(value);
+}
+
+/// Divide numerator by denominator, Return an error if quotient is not an integer, denominator is zero, or on overflow
+pub inline fn divExact(comptime T: type, numerator: T, denominator: T) !T {
+    return try math.divExact(T, numerator, denominator);
+}
+/// Divide numerator by denominator, rounding toward negative infinity
+pub inline fn divFloor(comptime T: type, numerator: T, denominator: T) !T {
+    return try math.divFloor(T, numerator, denominator);
+}
+/// Divide numerator by denominator, rounding toward zero
+pub inline fn divTrunc(comptime T: type, numerator: T, denominator: T) !T {
+    return try math.divTrunc(T, numerator, denominator);
+}
+'''
+);

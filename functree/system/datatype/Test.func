@@ -1,0 +1,1775 @@
+const System = import("../../System.func");
+const DataType = System.DataType;
+const Mem = System.Mem;
+const Math = System.Math;
+const Console = System.Io.Console;
+
+const FunctreeTest = import("../../Test.func");
+const expect = FunctreeTest.expect;
+const expectEqual = FunctreeTest.expectEqual;
+const expectEqualSlices = FunctreeTest.expectEqualSlices;
+const expectEqualStrings = FunctreeTest.expectEqualStrings;
+
+
+test "DataType: ptrFromInt and intFromPtr" {
+    const mmio_ptr: *volatile u8 = DataType.ptrFromInt(*volatile u8, 0x12345678);
+    code('''try expect(DataType.typeOf(mmio_ptr) == *volatile u8);''');
+
+    const ptr: *allowzero i32 = DataType.ptrFromInt(*allowzero i32, 0);
+    try expect(DataType.intFromPtr(ptr) == 0);
+}
+
+const Date = DataType.Date;
+test "Date: a addYear" {
+    var date = try Date.a(2025, 1, 6);
+
+    date.addYear(1);
+    try expect(date.year == 2026);
+
+    date.addYear(-1);
+    try expect(date.year == 2025);
+}
+test "Date: a addMonth" {
+    var date = try Date.a(2025, 1, 6);
+
+    date.addMonth(13);
+    try expect(date.year == 2026);
+    try expect(date.month == 2);
+
+    date.addMonth(-5);
+    try expect(date.year == 2025);
+    try expect(date.month == 9);
+}
+test "Date: a addDay" {
+    var date = try Date.a(2025, 1, 6);
+
+    date.addDay(-8);
+    try expect(date.year == 2024);
+    try expect(date.month == 12);
+    try expect(date.day == 29);
+
+    date.addDay(10);
+    try expect(date.year == 2025);
+    try expect(date.month == 1);
+    try expect(date.day == 8);
+}
+
+test "Date: compare" {
+    const date = try Date.parse("2025-1-6 9:5:8");
+    var date2 = try Date.parse("2025-1-6 9:5:8");
+    try expect(date.compare(date2) == 0);
+    date2.addDay(-1);
+    try expect(date.compare(date2) == 1);
+    date2.addDay(2);
+    try expect(date.compare(date2) == -1);
+}
+
+test "Date: dayInterval" {
+    const date = try Date.parse("2025-01-06");
+    const date2 = try Date.parse("2025-01-03");
+    const day_interval = date.dayInterval(date2);
+    try expect(day_interval == 3);
+}
+
+test "Date: equal" {
+    const date = try Date.parse("2025-1-6");
+    var date2 = try Date.parse("2025-1-6");
+    try expect(date.equal(date2));
+    date2.addDay(1);
+    try expect(!date.equal(date2));
+}
+
+test "Date: parse" {
+    const date = try Date.parse("2025-1-6");
+    try expect(date.year == 2025);
+    try expect(date.month == 1);
+    try expect(date.day == 6);
+
+    const date2 = try Date.parse("2025-01-06");
+    try expect(date2.year == 2025);
+    try expect(date2.month == 1);
+    try expect(date2.day == 6);
+}
+test "Date: parse2" {
+    const date = try Date.parse2("2025-01-06", "y-mm-dd");
+    try expect(date.year == 2025);
+    try expect(date.month == 1);
+    try expect(date.day == 6);
+
+    const date2 = try Date.parse2("1-6/2025", "m-d/y");
+    try expect(date2.year == 2025);
+    try expect(date2.month == 1);
+    try expect(date2.day == 6);
+}
+
+test "Date: today" {
+    var date = try Date.today();
+    date.setTimezone(.utc8);
+    var buffer: [20]u8 = undefined;
+    const date_str = date.toStr(&buffer);
+    Console.println(date_str);
+
+    try expect(date.year == 2026);
+    // try expect(date.month == 1);
+    //try expect(date.day == 18);
+}
+
+test "Date: a toStr" {
+    const date = try Date.a(-2025, 1, 6);
+    var buffer: [20]u8 = undefined;
+
+    const date_str = date.toStr(&buffer);
+    try expectEqualSlices(u8, "-2025-01-06", date_str);
+}
+test "Date: a toStr2" {
+    const date = try Date.a(2025, 1, 6);
+    var buffer: [20]u8 = undefined;
+
+    const date_str = try date.toStr2(&buffer, "y-m-d");
+    try expectEqualSlices(u8, "2025-1-6", date_str);
+
+    const date_str2 = try date.toStr2(&buffer, "y-mm-dd 00:00:00");
+    try expectEqualSlices(u8, "2025-01-06 00:00:00", date_str2);
+
+    const date_str3 = try date.toStr2(&buffer, "m-d/y");
+    try expectEqualSlices(u8, "1-6/2025", date_str3);
+}
+
+test "Date: toTimestamp" {
+    const date= try Date.today();
+    const ts = date.toTimestamp();
+    Console.print2("{d}\n", .{ts});
+}
+
+test "Date: toMilliTimestamp" {
+    const date = try Date.today();
+    const ts = date.toMilliTimestamp();
+    Console.print2("{d}\n", .{ts});
+}
+
+
+const DateTime = DataType.DateTime;
+test "DateTime: a addYear" {
+    var datetime = try DateTime.parse2("2025-01-06 09:05:03.008", "y-mm-dd hh:ii:ss.ll");
+
+    datetime.addYear(1);
+    try expect(datetime.year == 2026);
+
+    datetime.addYear(-1);
+    try expect(datetime.year == 2025);
+}
+test "DateTime: a addMonth" {
+    var datetime = try DateTime.parse2("2025-01-06 09:05:03.008", "y-mm-dd hh:ii:ss.ll");
+
+    datetime.addMonth(13);
+    try expect(datetime.year == 2026);
+    try expect(datetime.month == 2);
+
+    datetime.addMonth(-5);
+    try expect(datetime.year == 2025);
+    try expect(datetime.month == 9);
+}
+test "DateTime: a addDay" {
+    var datetime = try DateTime.parse2("2025-01-06 09:05:03.008", "y-mm-dd hh:ii:ss.ll");
+
+    datetime.addDay(-8);
+    try expect(datetime.year == 2024);
+    try expect(datetime.month == 12);
+    try expect(datetime.day == 29);
+
+    datetime.addDay(10);
+    try expect(datetime.year == 2025);
+    try expect(datetime.month == 1);
+    try expect(datetime.day == 8);
+}
+test "DateTime: a addHour" {
+    var datetime = try DateTime.parse2("2025-01-06 09:05:03.008", "y-mm-dd hh:ii:ss.ll");
+
+    datetime.addHour(-12);
+    try expect(datetime.year == 2025);
+    try expect(datetime.month == 1);
+    try expect(datetime.day == 5);
+    try expect(datetime.hour == 21);
+    try expect(datetime.minute == 5);
+    try expect(datetime.second == 3);
+
+    datetime.addHour(8);
+    try expect(datetime.year == 2025);
+    try expect(datetime.month == 1);
+    try expect(datetime.day == 6);
+    try expect(datetime.hour == 5);
+    try expect(datetime.minute == 5);
+    try expect(datetime.second == 3);
+}
+test "DateTime: a addMinute" {
+    var datetime = try DateTime.parse2("2025-01-06 09:05:03.008", "y-mm-dd hh:ii:ss.ll");
+
+    datetime.addMinute(-56);
+    try expect(datetime.year == 2025);
+    try expect(datetime.month == 1);
+    try expect(datetime.day == 6);
+    try expect(datetime.hour == 8);
+    try expect(datetime.minute == 9);
+    try expect(datetime.second == 3);
+
+    datetime.addMinute(56);
+    try expect(datetime.year == 2025);
+    try expect(datetime.month == 1);
+    try expect(datetime.day == 6);
+    try expect(datetime.hour == 9);
+    try expect(datetime.minute == 5);
+    try expect(datetime.second == 3);
+}
+test "DateTime: a addSecond" {
+    var datetime = try DateTime.parse2("2025-01-06 09:05:03.008", "y-mm-dd hh:ii:ss.ll");
+
+    datetime.addSecond(-3);
+    try expect(datetime.year == 2025);
+    try expect(datetime.month == 1);
+    try expect(datetime.day == 6);
+    try expect(datetime.hour == 9);
+    try expect(datetime.minute == 5);
+    try expect(datetime.second == 0);
+
+    datetime.addSecond(60);
+    try expect(datetime.year == 2025);
+    try expect(datetime.month == 1);
+    try expect(datetime.day == 6);
+    try expect(datetime.hour == 9);
+    try expect(datetime.minute == 6);
+    try expect(datetime.second == 0);
+}
+test "DateTime: a addMillisecond" {
+    var datetime = try DateTime.parse2("2025-01-06 09:05:03.008", "y-mm-dd hh:ii:ss.ll");
+
+    datetime.addMillisecond(-8);
+    try expect(datetime.year == 2025);
+    try expect(datetime.month == 1);
+    try expect(datetime.day == 6);
+    try expect(datetime.hour == 9);
+    try expect(datetime.minute == 5);
+    try expect(datetime.second == 3);
+    try expect(datetime.millisecond == 0);
+
+    datetime.addMillisecond(1000);
+    try expect(datetime.year == 2025);
+    try expect(datetime.month == 1);
+    try expect(datetime.day == 6);
+    try expect(datetime.hour == 9);
+    try expect(datetime.minute == 5);
+    try expect(datetime.second == 4);
+    try expect(datetime.millisecond == 0);
+}
+
+test "DateTime: compare" {
+    var datetime = try DateTime.parse("2025-1-6 9:5:8");
+    var datetime2 = try DateTime.parse("2025-1-6 9:5:8");
+    try expect(datetime.compare(datetime2) == 0);
+    datetime2.addDay(-1);
+    try expect(datetime.compare(datetime2) == 1);
+    datetime2.addDay(2);
+    try expect(datetime.compare(datetime2) == -1);
+}
+
+test "DateTime: equal" {
+    const datetime = try DateTime.parse("2025-1-6 9:5:8");
+    var datetime2 = try DateTime.parse("2025-1-6 9:5:8");
+    try expect(datetime.equal(datetime2));
+    datetime2.addDay(1);
+    try expect(!datetime.equal(datetime2));
+}
+
+test "DateTime: now" {
+    var datetime = try DateTime.now();
+    datetime.setTimezone(.utc8);
+    var buffer: [30]u8 = undefined;
+    const datetime_str = try datetime.toStr2(&buffer, "y-mm-dd hh:ii:ss");
+    Console.println(datetime_str);
+    try expect(datetime.year == 2026);
+    // try expect(datetime.month == 1);
+    //try expect(datetime.day == 18);
+    //try expect(datetime.hour == 18);
+}
+test "DateTime: now2" {
+    var datetime = try DateTime.now2();
+    datetime.setTimezone(.utc8);
+    var buffer: [30]u8 = undefined;
+    const datetime_str = try datetime.toStr2(&buffer, "y-mm-dd hh:ii:ss.ll");
+    Console.println(datetime_str);
+    try expect(datetime.year == 2026);
+    // try expect(datetime.month == 1);
+    //try expect(datetime.day == 18);
+    //try expect(datetime.hour == 18);
+}
+test "DateTime: now3" {
+    var datetime = try DateTime.now3();
+    datetime.setTimezone(.utc8);
+    var buffer: [30]u8 = undefined;
+    const datetime_str = try datetime.toStr2(&buffer, "y-mm-dd hh:ii:ss.uu");
+    Console.println(datetime_str);
+    try expect(datetime.year == 2026);
+    // try expect(datetime.month == 1);
+    // try expect(datetime.day == 18);
+    // try expect(datetime.hour == 18);
+}
+
+test "DateTime: parse" {
+    const datetime = try DateTime.parse("2025-1-6 9:5:8");
+    try expect(datetime.year == 2025);
+    try expect(datetime.month == 1);
+    try expect(datetime.day == 6);
+    try expect(datetime.hour == 9);
+    try expect(datetime.minute == 5);
+    try expect(datetime.second == 8);
+
+    const datetime2 = try DateTime.parse("2025-01-06 09:05:03");
+    try expect(datetime2.year == 2025);
+    try expect(datetime2.month == 1);
+    try expect(datetime2.day == 6);
+    try expect(datetime2.hour == 9);
+    try expect(datetime2.minute == 5);
+    try expect(datetime2.second == 3);
+}
+test "DateTime: parse2" {
+    const datetime = try DateTime.parse2("2025-01-06 09:05:03.008", "y-mm-dd hh:ii:ss.ll");
+    try expect(datetime.year == 2025);
+    try expect(datetime.month == 1);
+    try expect(datetime.day == 6);
+    try expect(datetime.hour == 9);
+    try expect(datetime.minute == 5);
+    try expect(datetime.second == 3);
+    try expect(datetime.millisecond == 8);
+
+    const datetime2 = try DateTime.parse2("1-6/2025 9:5:3", "m-d/y h:i:s");
+    try expect(datetime2.year == 2025);
+    try expect(datetime2.month == 1);
+    try expect(datetime2.day == 6);
+    try expect(datetime2.hour == 9);
+    try expect(datetime2.minute == 5);
+    try expect(datetime2.second == 3);
+}
+
+test "DateTime: toStr" {
+    const datetime = try DateTime.parse("2025-01-06 09:05:03");
+    var buffer: [30]u8 = undefined;
+
+    const datetime_str = datetime.toStr(&buffer);
+    try expectEqualSlices(u8, "2025-01-06 09:05:03", datetime_str);
+}
+test "DateTime: toStr2" {
+    const datetime = try DateTime.parse2("2025-01-06 09:05:03.008", "y-mm-dd hh:ii:ss.ll");
+    var buffer: [30]u8 = undefined;
+
+    const datetime_str = try datetime.toStr2(&buffer, "y-mm-dd hh:ii:ss.ll");
+    try expectEqualSlices(u8, "2025-01-06 09:05:03.008", datetime_str);
+
+    const datetime_str2 = try datetime.toStr2(&buffer, "y-m-d h:i:s.l");
+    try expectEqualSlices(u8, "2025-1-6 9:5:3.8", datetime_str2);
+
+    const datetime_str3 = try datetime.toStr2(&buffer, "y-mm-ddThh:ii:ssZ");
+    try expectEqualSlices(u8, "2025-01-06T09:05:03Z", datetime_str3);
+
+    const datetime2 = try DateTime.parse2("2025-01-06 09:05:03.000008", "y-mm-dd hh:ii:ss.uu");
+
+    const datetime_str5 = try datetime2.toStr2(&buffer, "y-mm-dd hh:ii:ss.uu");
+    try expectEqualSlices(u8, "2025-01-06 09:05:03.000008", datetime_str5);
+
+    const datetime3 = try DateTime.parse2("2025-01-06 09:05:03.000000008", "y-mm-dd hh:ii:ss.nn");
+
+    const datetime_str6 = try datetime3.toStr2(&buffer, "y-mm-dd hh:ii:ss.nn");
+    try expectEqualSlices(u8, "2025-01-06 09:05:03.000000008", datetime_str6);
+}
+
+test "DateTime: toTimestamp" {
+    const datetime = try DateTime.now();
+    const ts = datetime.toTimestamp();
+    const ts2 = DateTime.timestamp();
+
+    try expect(ts == ts2);
+}
+test "DateTime: toMilliTimestamp" {
+    const datetime = try DateTime.now2();
+    const ts = try datetime.toMilliTimestamp();
+    const ts2 = DateTime.milliTimestamp();
+    Console.print2("{d}, {d}\n", .{ts, ts2});
+    try expect(ts == ts2);
+}
+test "DateTime: toMicroTimestamp" {
+    const datetime = try DateTime.now3();
+    const ts = try datetime.toMicroTimestamp();
+    const ts2 = DateTime.microTimestamp();
+    // Console.print2("{d}, {d}\n", .{ts, ts2});
+    try expect(try Math.divFloor(i64, ts, 1000) == try Math.divFloor(i64, ts2, 1000));
+}
+
+test "DateTime: timeInterval" {
+    const datetime = try DateTime.parse2("2025-01-06 09:05:03.008", "y-mm-dd hh:ii:ss.ll");
+    const datetime2 = try DateTime.parse2("2025-01-06 09:05:03.013", "y-mm-dd hh:ii:ss.ll");
+    const time_interval = try datetime.timeInterval(datetime2);
+    try expect(time_interval.days == 0);
+    try expect(time_interval.hours == 0);
+    try expect(time_interval.minutes == 0);
+    try expect(time_interval.seconds == 0);
+    try expect(time_interval.milliseconds == 5);
+
+    const datetime3 = try DateTime.parse2("2025-01-06 09:05:08.000008", "y-mm-dd hh:ii:ss.uu");
+    const datetime4 = try DateTime.parse2("2025-01-06 09:05:03.000008", "y-mm-dd hh:ii:ss.uu");
+    const time_interval2 = try datetime3.timeInterval(datetime4);
+    try expect(time_interval2.days == 0);
+    try expect(time_interval2.hours == 0);
+    try expect(time_interval2.minutes == 0);
+    try expect(time_interval2.seconds == 5);
+    try expect(time_interval2.milliseconds == 0);
+
+    const datetime5 = try DateTime.parse2("2025-01-06 09:10:03.000000008", "y-mm-dd hh:ii:ss.nn");
+    const datetime6 = try DateTime.parse2("2025-01-06 09:05:03.000000008", "y-mm-dd hh:ii:ss.nn");
+    const time_interval3 = try datetime5.timeInterval(datetime6);
+    try expect(time_interval3.days == 0);
+    try expect(time_interval3.hours == 0);
+    try expect(time_interval3.minutes == 5);
+    try expect(time_interval3.seconds == 0);
+    try expect(time_interval3.milliseconds == 0);
+}
+
+
+const Float = DataType.Float;
+test "Float: parse" {
+    const d = Float.parse("123.23") catch(err) return err;
+    const d2 = Float.parse2(f32, "126.23") catch(err) return err;
+
+    try expect(d==123.23);
+    try expect(d2==126.23);
+}
+
+test "Float: toStr2" {
+    var buffer: [1024]u8 = undefined;
+
+    const float_str = try Float.toStr2(&buffer, 99.38);
+
+    try expect(String.equalStr(float_str, "99.38"));
+}
+
+test "Float: minValue maxValue" {
+    const d8 = Float.minValue(f16);
+    const d9 = Float.maxValue(f16);
+
+    try expect(d8==0.00006104);
+    try expect(d9==65500.0);
+}
+
+
+const Integer = DataType.Integer;
+test "Integer: parse" {
+    const d = Integer.parse("123") catch(err) return err;
+    const d2 = Integer.parse2(u16, "567") catch(err) return err;
+
+    try expect(d==123);
+    try expect(d2==567);
+}
+
+test "Integer: toStr2" {
+    var buffer: [1024]u8 = undefined;
+
+    const integer_str = try Integer.toStr2(&buffer, 9999);
+
+    try expect(String.equalStr(integer_str[0..4], "9999"));
+}
+
+test "Integer: minValue maxValue" {
+    const d8 = Integer.minValue(u32);
+    const d9 = Integer.maxValue(u32);
+
+    try expect(d8==0);
+    try expect(d9==4294967295);
+}
+
+
+const Json = DataType.Json;
+const JsonObject = Json.JsonObject;
+const JsonArray = Json.JsonArray;
+pub const JsonValue = Json.JsonValue;
+test "Json: a JsonObject" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    var object = JsonObject.a(&mem);
+    try object.add("string", "abc");
+    try object.add("integer", 23);
+    const large_number: u64 = 18446744073709551615;
+    try object.add("number_string", large_number);
+
+    const actual = try object.toStr();
+    const expected = "{\"string\":\"abc\",\"integer\":23,\"number_string\":18446744073709551615}";
+    try expectEqualStrings(expected, actual);
+}
+test "Json: JsonObject parse str" {
+    const json_str =
+        '''
+        {
+          "Image": {
+              "Width":  800,
+              "Height": 600,
+              "Title":  "View from 15th Floor",
+              "File":  null,
+              "Thumbnail": {
+                  "Url":    "http://www.example.com/image/481989943",
+                  "Height": 125,
+                  "Width":  100
+              },
+              "Animated" : false,
+              "IDs": [116, 943, 234, 38793],
+              "ArrayOfObject": [{"n": "m"}],
+              "double": 1.3412,
+              "LargeInt": 18446744073709551615
+            }
+        }
+        '''
+    ;
+    // init heap memory
+     var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    const json_object = try JsonObject.parse(&mem, json_str);
+
+    const image = json_object.getJsonObject("Image").?;
+
+    try expect(image.getInteger("Width").? == 800);
+
+    try expect(image.get("File").?.null == {});
+
+    try expect(image.getBool("Animated").? == false);
+
+    const ids = image.getJsonArray("IDs").?;
+    try expect(ids.values()[1].integer == 943);
+
+    const array_of_object = image.getJsonArray("ArrayOfObject").?;
+    try expect(String.equalStr(array_of_object.values()[0].object.get("n").?.string, "m"));
+
+    const double = image.getFloat("double").?;
+    try expect(double == 1.3412);
+
+    const large_int_str = image.getNumberString("LargeInt").?;
+    try expect(String.equalStr(large_int_str, "18446744073709551615"));
+}
+test "Json: a JsonArray" {
+    // init heap memory
+    var mem = Mem.a();
+    // auto free memory by arena
+    mem.f();
+    defer mem.d();
+
+    var object = JsonObject.a(&mem);
+    try object.add("a", "b");
+
+    var array = Json.JsonArray.a(&mem);
+    try array.add(1);
+    try array.add(2);
+    const i: i32 = 3;
+    try array.add(i);
+    try array.add(null);
+
+    var array_parent = Json.JsonArray.a(&mem);
+    try array_parent.add(true);
+    try array_parent.add(42);
+    try array_parent.add(4300000000000000);
+    try array_parent.add(4.2);
+    try array_parent.add("weeee");
+    try array_parent.add(array);
+    try array_parent.add(object);
+
+    const actual = try array_parent.toStr();
+    const expected = "[true,42,4300000000000000,4.2,\"weeee\",[1,2,3,null],{\"a\":\"b\"}]";
+    try expectEqualStrings(expected, actual);
+}
+test "Json: JsonArray parse str" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    const ids = "[116, 943, 234, 38793]";
+    const array_ids = try JsonArray.parse(&mem, ids);
+    try expect(array_ids.values()[1].integer == 943);
+
+    const objects = "[{\"n\": \"m\"}]";
+    const array_objects = try JsonArray.parse(&mem, objects);
+    try expect(String.equalStr(array_objects.values()[0].object.get("n").?.string, "m"));
+}
+
+test "Json: parse" {
+    const json_str =
+        '''
+        {
+          "Image": {
+              "Width":  800,
+              "Height": 600,
+              "Title":  "View from 15th Floor",
+              "File":  null,
+              "Thumbnail": {
+                  "Url":    "http://www.example.com/image/481989943",
+                  "Height": 125,
+                  "Width":  100
+              },
+              "Animated" : false,
+              "IDs": [116, 943, 234, 38793],
+              "ArrayOfObject": [{"n": "m"}],
+              "double": 1.3412,
+              "LargeInt": 18446744073709551615
+            }
+        }
+        '''
+    ;
+    // init heap memory
+     var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    const json_value = try Json.parse(&mem, json_str);
+
+    const image = json_value.object.get("Image").?;
+
+    try expect(image.object.get("Width").?.integer == 800);
+
+    try expect(image.object.get("File").?.null == {});
+
+    try expect(image.object.get("Animated").?.bool == false);
+
+    const ids = image.object.get("IDs").?;
+    try expect(ids.array.items[1].integer == 943);
+
+    const array_of_object = image.object.get("ArrayOfObject").?;
+    try expect(String.equalStr(array_of_object.array.items[0].object.get("n").?.string, "m"));
+
+    const double = image.object.get("double").?;
+    try expect(double.float == 1.3412);
+
+    const large_int = image.object.get("LargeInt").?;
+    try expect(String.equalStr(large_int.number_string, "18446744073709551615"));
+}
+test "Json: toStr" {
+    var buffer: [10000]u8 = undefined;
+
+    //JsonObject
+    const actual = try Json.toStr(&buffer, .{ .foo = "bar", .answer = 42, .my_friend = "sammy" });
+    const expected = "{\"foo\":\"bar\",\"answer\":42,\"my_friend\":\"sammy\"}";
+    try expectEqualStrings(expected, actual);
+
+    //JsonArray
+    const Func = func {
+        foo: u32,
+    };
+    //const value: []Func = [Func(foo=42), Func(foo=100), Func(foo=1000)];
+    //const actual2 = try Json.toStr(&buffer, value);
+    const actual2 = try Json.toStr(&buffer, [Func{.foo=42}, Func{.foo=100}, Func{.foo=1000}]);
+
+    const expected2 = "[{\"foo\":42},{\"foo\":100},{\"foo\":1000}]";
+    try expectEqualStrings(expected2, actual2);
+}
+
+
+const List = DataType.List;
+test "List: a values()" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    var list = List.t(u8).a(&mem);
+    defer list.d();
+
+    try list.add(1);
+    try list.add(2);
+    try list.add(3);
+    for (list.values()) |item| {
+        _ = item;
+    }
+    _ = list.count();
+    try list.add2(1, 9);
+    try expect(list.values()[1] == 9);
+
+    var list2 = List.t(str).a(&mem);
+    try list2.add("1");
+    try list2.add("2");
+    try list2.add("3");
+    try expect(String.equalStr(list2.values()[1], "2"));
+
+    var list3 = try list2.clone();
+    try expect(String.equalStr(list3.values()[1], "2"));
+}
+
+test "List: a2 toArray" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    var array: []u8 = [1,3,5];
+    var list = try List.t(u8).a2(&mem, &array);
+    defer list.d();
+
+    for (list.values()) |item| {
+        _ = item;
+    }
+    try expect(list.values()[1] == 3);
+
+    try list.addArray2(2, &array);
+    try expect(list.values().len == 6);
+
+    const array2 = try list.toArray();
+    try expect(array2[5] == 5);
+}
+
+
+const Map = DataType.Map;
+test "Map: t" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    var map = Map.t(u8, str).a(&mem);
+    try map.add(1, "a");
+    try map.add(2, "b");
+    try map.add(3, "c");
+
+    try expect(String.equalStr(map.get(2).?, "b"));
+    try expect(map.count() == 3);
+}
+
+
+const StringMap = DataType.StringMap;
+test "StringMap: t" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    var param = StringMap.t(u8).a(&mem);
+    try param.add("a", 1);
+    try param.add("b", 2);
+    try param.add("c", 3);
+
+    try expect(param.get("b").? == 2);
+    try expect(param.count() == 3);
+}
+
+
+const Result = DataType.Result;
+const FileOpenError = error{
+    AccessDenied,
+    OutOfMemory,
+    FileNotFound,
+};
+test "Result: t" {
+    var result = Result.t(u8, FileOpenError).a();
+    if (result.ok()) {
+        Console.print("result is undefined.\n");
+    }
+    result.v(1);
+    try expect(result.value == 1);
+
+    var result2 = Result.t(?u8, FileOpenError).a();
+    result2.v(1);
+    try expect(result2.value.? == 1);
+    if (result2.ok()) {
+        Console.print("result2 is ok.\n");
+    }
+
+    result2.e(FileOpenError.OutOfMemory);
+    try expect(result2.err == FileOpenError.OutOfMemory);
+    if (!result2.ok()) {
+        Console.print("result2 is error.\n");
+    }
+}
+
+
+const Char = DataType.Char;
+test "Char: isControl isDigit isDigit" {
+    try expect(Char.isControl(Char.control_code.del));
+    try expect(!Char.isControl(0x80));
+
+    try expect(!Char.isDigit('e'));
+    try expect(Char.isDigit('6'));
+
+    try expect(!Char.isLower('Z'));
+    try expect(Char.isLower('z'));
+}
+
+test "Char: isUtf8Codepoint" {
+    try expect(Char.isUtf8Codepoint('e'));
+    try expect(Char.isUtf8Codepoint('中'));
+}
+
+test "Char: utf8Encode and utf8Decode" {
+    const codepoint = try Char.utf8Decode("𐍈");
+    const s1 = try Char.utf8Encode(codepoint);
+
+    try expect(codepoint == 66376);
+    try expect(s1[0] == 0b11110000);
+    try expect(s1[1] == 0b10010000);
+    try expect(s1[2] == 0b10001101);
+    try expect(s1[3] == 0b10001000);
+}
+
+test "Char: getUtf8Iter" {
+    var it = try Char.getUtf8Iter("abc");
+    while (s1 in it.nextCodepointSlice()) {
+        Console.println(s1);
+    }
+}
+
+
+const String = DataType.String;
+test "String: a" {
+    // init stack memory
+    var buffer: [100]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    const string = try String.a(&mem, "abc");
+    try expect(String.equalStr(string.toStr(), "abc"));
+
+    const string2 = try String.a(&mem, "def");
+    const string3 = try string.concat(string2);
+    try expect(String.equalStr(string3.toStr(), "abcdef"));
+}
+
+test "String: clone" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    const string = try String.a(&mem, "abc");
+    const string_clone = try string.clone();
+
+    try expect(string.equal(string_clone));
+}
+
+test "String: count" {
+    var buffer: [100]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    const string = try String.a(&mem, "abc,d,ef");
+
+    try expect(string.count(",") == 2);
+}
+
+test "String: indexOf lastIndexOf" {
+    var buffer: [100]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    const string = try String.a(&mem, "abc,d,ef");
+
+    try expect(string.indexOf(",") == 3);
+    try expect(string.lastIndexOf(",") == 5);
+}
+
+test "String: replace" {
+    var buffer: [100]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    const string = try String.a(&mem, "abc,def,ghi");
+    const string_new = try string.replace(",", "|");
+
+    try expect(String.equalStr(string_new.toStr(), "abc|def|ghi"));
+}
+
+test "String: split" {
+    var buffer: [300]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    const string = try String.a(&mem, "abc,def,ghi");
+    const string_array = try string.split(",");
+
+    try expect(String.equalStr(string_array[1].toStr(), "def"));
+}
+
+test "String: toUtf8Array" {
+    var buffer: [300]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    const string = try String.a(&mem, "abc中文123");
+    const str_array = try string.toUtf8Array();
+
+    try expect(String.equalStr(str_array[3], "中"));
+}
+
+test "String: startWith endWith" {
+    var buffer: [300]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    const string = try String.a(&mem, "abc,def,ghi");
+
+    try expect(string.startWith("abc"));
+    try expect(string.endWith("hi"));
+}
+
+test "String: lower" {
+    var buffer: [1000]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    const string = try String.a(&mem, "ABc");
+    const string2 = try string.lower();
+    Console.print2("String: lower==={s}", .{string2.toStr()});
+
+    try expect(String.equalStr(string2.toStr(), "abc"));
+}
+test "String: upper" {
+    var buffer: [1000]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    const string = try String.a(&mem, " abC\n");
+    const string2 = try string.upper();
+
+    try expect(String.equalStr(string2.toStr(), " ABC\n"));
+}
+
+test "String: trim" {
+    var buffer: [100]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    const string = try String.a(&mem, " abc\n");
+    const string2 = try string.trim();
+
+    try expect(String.equalStr(string2.toStr(), "abc"));
+}
+
+test "String: trimLeft" {
+    var buffer: [100]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    const string = try String.a(&mem, " abc\n");
+    const string2 = try string.trimLeft();
+
+    try expect(String.equalStr(string2.toStr(), "abc\n"));
+}
+
+test "String: trimRight" {
+    var buffer: [100]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    const string = try String.a(&mem, " abc\n");
+    const string2 = try string.trimRight();
+
+    try expect(String.equalStr(string2.toStr(), " abc"));
+}
+
+test "String: isNumberStr" {
+    const testCases: []str = [
+        "123",    // true
+        "-123",   // true
+        "+123",   // true
+        "12.34",  // true
+        "-12.34", // true
+        ".123",   // true
+        "123.",   // true
+        "+.123",  // true
+        "",       // false
+        "abc",    // false
+        "12.34.56", // false
+        "--123",  // false
+        "12a34",  // false
+    ];
+
+    for (testCases) |case| {
+        Console.print2("Is '{s}' a number? {any}\n", .{case, String.isNumberStr(case)});
+    }
+}
+
+test "String: isUtf8Str" {
+    try expect(String.isUtf8Str("abc"));
+    try expect(String.isUtf8Str("中文"));
+}
+
+test "String: formatStr" {
+    // init stack memory
+    var buffer: [1024]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    const str_format = try String.formatStr(&mem, "{s}+{s}={s}", ["a", "b", "c"]);
+
+    try expect(String.equalStr(str_format, "a+b=c"));
+}
+
+test "String: formatStr2" {
+    var buffer: [29]u8 = undefined;
+    const str_buffer = try String.formatStr2(&buffer, "{s}+{s}={s}", ["a", "b", "c"]);
+
+    try expect(String.equalStr(str_buffer, "a+b=c"));
+}
+
+test "String: joinStr" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    const str_join = String.joinStr(&mem, ",", &[ "a", "b", "c" ]) catch(err) return err;
+
+    try expect(String.equalStr(str_join, "a,b,c"));
+}
+
+test "String: replaceStr" {
+    // init stack memory
+    var buffer: [1024]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    const input = "abc,def,ghi";
+    const result_str = try String.replaceStr(&mem, input, ",", "|");
+
+    try expect(String.equalStr(result_str, "abc|def|ghi"));
+}
+test "String: replaceStr2" {
+    var output: [29]u8 = undefined;
+    const input = "abc,def,ghi";
+    const result_str = String.replaceStr2(output[0..], input, ",", "|");
+
+    try expect(String.equalStr(result_str, "abc|def|ghi"));
+}
+
+test "String: splitStr" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    const string = "abc,def,ghi";
+    const str_array = try String.splitStr(&mem, string, ",");
+
+    try expect(String.equalStr(str_array[1], "def"));
+}
+
+test "String: startWithStr" {
+    const string = "abc,def,ghi";
+    const is_start = String.startWithStr(string, "abc");
+
+    try expect(is_start);
+}
+test "String: endWithStr" {
+    const string = "abc,def,ghi";
+    const is_end = String.endWithStr(string, "hi");
+
+    try expect(is_end);
+}
+
+test "String: trimStr" {
+    const string = " abc\n";
+    const string_trim = String.trimStr(string);
+
+    try expect(String.equalStr(string_trim, "abc"));
+}
+test "String: trimLeftStr" {
+    const string = " abc\n";
+    const string_trim = String.trimLeftStr(string);
+
+    try expect(String.equalStr(string_trim, "abc\n"));
+}
+test "String: trimRightStr" {
+    const string = " abc\n";
+    const string_trim = String.trimRightStr(string);
+
+    try expect(String.equalStr(string_trim, " abc"));
+}
+
+
+const Tensor = DataType.Tensor;
+test "Tensor: rand" {
+    var buffer: [1000]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    var tensor = try Tensor.rand(&mem, &[3, 6]);
+    defer tensor.d();
+    Console.print2("\n{s}:\n", .{"Tensor rand"});
+    try tensor.print();
+}
+
+test "Tensor: 2D" {
+    var buffer: [1000]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    // comptime array
+    const mat: [2][2]f32 = [
+        [ 1.0, 2.0 ],
+        [ 3.0, 4.0 ]
+    ];
+
+    // init from array
+    var tensor = try Tensor.a2(&mem, mat);
+    defer tensor.d();
+
+    // verify shape
+    try expectEqualSlices(usize, &[2, 2], tensor.shape);
+
+    // verify data
+    try expectEqual(tensor.get(&[0, 0]), 1.0);
+    try expectEqual(tensor.get(&[1, 1]), 4.0);
+    // try tensor.print();
+}
+
+test "Tensor: 3D" {
+    var buffer: [1000]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    const tensor_3d: [2][2][2]f32 = [
+        [
+            [1.0, 2.0],
+            [3.0, 4.0]
+        ],
+        [
+            [5.0, 6.0],
+            [7.0, 8.0]
+        ]
+    ];
+
+    var tensor = try Tensor.a2(&mem, tensor_3d);
+    defer tensor.d();
+
+    try expectEqualSlices(usize, &[2, 2, 2], tensor.shape);
+    try expectEqual(tensor.get(&[1, 0, 1]), 6.0);
+}
+
+test "Tensor: addTensor subTensor mulTensor divTensor powTensor" {
+    var buffer: [2000]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    // 1. 2x2 matrix
+    const array1: [2][2]f32 = [
+        [ 1.0, 2.0 ],
+        [ 3.0, 4.0 ]
+    ];
+    var mat_a = try Tensor.a2(&mem, array1);
+    defer mat_a.d();
+
+    const array2: [2][2]f32 = [
+        [5.0, 6.0],
+        [7.0, 8.0]
+    ];
+    var mat_b = try Tensor.a2(&mem, array2);
+    defer mat_b.d();
+
+    // 2. addTensor
+    var mat_add = try mat_a.addTensor(mat_b);
+    defer mat_add.d();
+    Console.print2("\n{s}:\n", .{"Tensor addTensor"});
+    try mat_add.print(); // Shape: [2, 2], Data: [[6.0, 8.0], [10.0, 12.0]]
+    // 3. subTensor
+    var mat_sub = try mat_a.subTensor(mat_b);
+    defer mat_sub.d();
+    Console.print2("\n{s}:\n", .{"Tensor subTensor"});
+    try mat_sub.print();
+    // 4. mulTensor
+    var mat_mul = try mat_a.mulTensor(mat_b);
+    defer mat_mul.d();
+    Console.print2("\n{s}:\n", .{"Tensor mulTensor"});
+    try mat_mul.print();
+    // 5. divTensor
+    var mat_div = try mat_a.divTensor(mat_b);
+    defer mat_div.d();
+    Console.print2("\n{s}:\n", .{"Tensor divTensor"});
+    try mat_div.print();
+    // 5. powTensor
+    var mat_pow = try mat_a.powTensor(mat_b);
+    defer mat_pow.d();
+    Console.print2("\n{s}:\n", .{"Tensor powTensor"});
+    try mat_pow.print();
+}
+
+test "Tensor: addTensor2 subTensor2 mulTensor2 divTensor2 powTensor2" {
+    var buffer: [2000]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    // 1. 2x2 matrix
+    const array1: [2][2]f32 = [
+        [ 1.0, 2.0 ],
+        [ 3.0, 4.0 ]
+    ];
+    var mat_a = try Tensor.a2(&mem, array1);
+    defer mat_a.d();
+
+    const array2: [2][2]f32 = [
+        [5.0, 6.0],
+        [7.0, 8.0]
+    ];
+    var mat_b = try Tensor.a2(&mem, array2);
+    defer mat_b.d();
+
+    // 2. addTensor
+    var mat_add = try mat_a.addTensor2(mat_b);
+    defer mat_add.d();
+    Console.print2("\n{s}:\n", .{"Tensor addTensor2"});
+    try mat_add.print(); // Shape: [2, 2], Data: [[6.0, 8.0], [10.0, 12.0]]
+    // 3. subTensor
+    var mat_sub = try mat_a.subTensor2(mat_b);
+    defer mat_sub.d();
+    Console.print2("\n{s}:\n", .{"Tensor subTensor2"});
+    try mat_sub.print();
+    // 4. mulTensor
+    var mat_mul = try mat_a.mulTensor2(mat_b);
+    defer mat_mul.d();
+    Console.print2("\n{s}:\n", .{"Tensor mulTensor2"});
+    try mat_mul.print();
+    // 5. divTensor
+    var mat_div = try mat_a.divTensor2(mat_b);
+    defer mat_div.d();
+    Console.print2("\n{s}:\n", .{"Tensor divTensor2"});
+    try mat_div.print();
+    // 5. powTensor
+    var mat_pow = try mat_a.powTensor2(mat_b);
+    defer mat_pow.d();
+    Console.print2("\n{s}:\n", .{"Tensor powTensor2"});
+    try mat_pow.print();
+}
+
+test "Tensor: matMul" {
+    var buffer: [2000]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    // 1. 2x2 matrix
+    const array1: [2][2]f32 = [
+        [ 1.0, 2.0 ],
+        [ 3.0, 4.0 ]
+    ];
+    var mat_a = try Tensor.a2(&mem, array1);
+    defer mat_a.d();
+
+    const array2: [2][2]f32 = [
+        [5.0, 6.0],
+        [7.0, 8.0]
+    ];
+    var mat_b = try Tensor.a2(&mem, array2);
+    defer mat_b.d();
+
+    // 2. matrix mulTensor
+    var mat_mul = try mat_a.matMul(mat_b);
+    defer mat_mul.d();
+    Console.print2("\n{s}:\n", .{"Tensor matMul"});
+    try mat_mul.print();
+}
+test "Tensor: matMul 2" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    // 1. 3x2 matrix
+    const array1: [3][2]f32 = [
+        [ 1.0, 2.0 ],
+        [ 3.0, 4.0 ],
+        [ 5.0, 6.0 ]
+    ];
+    var mat_a = try Tensor.a2(&mem, array1);
+    defer mat_a.d();
+
+    // 2. 2x4 matrix
+    const array2: [2][4]f32 = [
+        [7.0, 8.0, 9.0, 10.0],
+        [11.0, 12.0, 13.0, 14.0]
+    ];
+    var mat_b = try Tensor.a2(&mem, array2);
+    defer mat_b.d();
+
+    // 3. matrix mull
+    var mat_mul = try mat_a.matMul(mat_b);
+    defer mat_mul.d();
+    Console.print2("\n{s}:\n", .{"Tensor matMul 2"});
+    try mat_mul.print();
+}
+
+test "Tensor: sum sum2" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    // 2x2 matrix
+    const array1: [2][2]f32 = [
+        [ 1.0, 2.0 ],
+        [ 3.0, 4.0 ]
+    ];
+    var mat_a = try Tensor.a2(&mem, array1);
+    defer mat_a.d();
+    try expect(mat_a.sum() == 10.0);
+    try expect(try mat_a.sum2(&[0, -1]) == 3.0);
+    try expect(try mat_a.sum2(&[-1, 1]) == 6.0);
+
+    // 2x2x2 tensor
+    const array2: [2][2][2]f32 = [
+        [
+            [ 1.0, 2.0 ],
+            [ 3.0, 4.0 ]
+        ],
+        [
+            [ 5.0, 6.0 ],
+            [ 7.0, 8.0 ]
+        ]
+    ];
+    var tensor = try Tensor.a2(&mem, array2);
+    defer tensor.d();
+    try expect(try tensor.sum2(&[-1, 0, -1]) == 14.0);
+    try expect(try tensor.sum2(&[-1, 1, -1]) == 22.0);
+    try expect(try tensor.sum2(&[-1, -1, 1]) == 20.0);
+}
+
+test "Tensor: mean mean2" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    // 2x2 matrix
+    const array1: [2][2]f32 = [
+        [ 1.0, 2.0 ],
+        [ 3.0, 4.0 ]
+    ];
+    var mat_a = try Tensor.a2(&mem, array1);
+    defer mat_a.d();
+    try expect(mat_a.mean() == 2.5);
+    try expect(try mat_a.mean2(&[0, -1]) == 1.5);
+    try expect(try mat_a.mean2(&[-1, 1]) == 3.0);
+
+    // 2x2x2 tensor
+    const array2: [2][2][2]f32 = [
+        [
+            [ 1.0, 2.0 ],
+            [ 3.0, 4.0 ]
+        ],
+        [
+            [ 5.0, 6.0 ],
+            [ 7.0, 8.0 ]
+        ]
+    ];
+    var tensor = try Tensor.a2(&mem, array2);
+    defer tensor.d();
+    try expect(try tensor.mean2(&[-1, 0, -1]) == 7.0);
+    try expect(try tensor.mean2(&[-1, 1, -1]) == 11.0);
+    try expect(try tensor.mean2(&[-1, -1, 1]) == 10.0);
+}
+
+test "Tensor: max max2" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    // 2x2 matrix
+    const array1: [2][2]f32 = [
+        [ 1.0, 2.0 ],
+        [ 3.0, 4.0 ]
+    ];
+    var mat_a = try Tensor.a2(&mem, array1);
+    defer mat_a.d();
+    try expect(mat_a.max() == 4.0);
+    try expect(try mat_a.max2(&[0, -1]) == 2.0);
+    try expect(try mat_a.max2(&[-1, 1]) == 4.0);
+
+    // 2x2x2 tensor
+    const array2: [2][2][2]f32 = [
+        [
+            [ 1.0, 2.0 ],
+            [ 3.0, 4.0 ]
+        ],
+        [
+            [ 5.0, 6.0 ],
+            [ 7.0, 8.0 ]
+        ]
+    ];
+    var tensor = try Tensor.a2(&mem, array2);
+    defer tensor.d();
+    try expect(try tensor.max2(&[-1, 0, -1]) == 6.0);
+    try expect(try tensor.max2(&[-1, 1, -1]) == 8.0);
+    try expect(try tensor.max2(&[-1, -1, 1]) == 8.0);
+}
+
+test "Tensor: min min2" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    // 2x2 matrix
+    const array1: [2][2]f32 = [
+        [ 1.0, 2.0 ],
+        [ 3.0, 4.0 ]
+    ];
+    var mat_a = try Tensor.a2(&mem, array1);
+    defer mat_a.d();
+    try expect(mat_a.min() == 1.0);
+    try expect(try mat_a.min2(&[0, -1]) == 1.0);
+    try expect(try mat_a.min2(&[-1, 1]) == 2.0);
+
+    // 2x2x2 tensor
+    const array2: [2][2][2]f32 = [
+        [
+            [ 1.0, 2.0 ],
+            [ 3.0, 4.0 ]
+        ],
+        [
+            [ 5.0, 6.0 ],
+            [ 7.0, 8.0 ]
+        ]
+    ];
+    var tensor = try Tensor.a2(&mem, array2);
+    defer tensor.d();
+    try tensor.print();
+    try expect(try tensor.min2(&[-1, 0, -1]) == 1.0);
+    try expect(try tensor.min2(&[-1, 1, -1]) == 3.0);
+    try expect(try tensor.min2(&[-1, -1, 1]) == 2.0);
+}
+
+test "Tensor: concat" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    var tensor1 = try Tensor.a(&mem, &[2, 2]);
+    defer tensor1.d();
+    tensor1.set(&[0, 0], 1.0);
+    tensor1.set(&[0, 1], 2.0);
+    tensor1.set(&[1, 0], 3.0);
+    tensor1.set(&[1, 1], 4.0);
+
+    var tensor2 = try Tensor.a(&mem, &[2, 2]);
+    defer tensor2.d();
+    tensor2.set(&[0, 0], 5.0);
+    tensor2.set(&[0, 1], 6.0);
+    tensor2.set(&[1, 0], 7.0);
+    tensor2.set(&[1, 1], 8.0);
+
+    var mat_c = try Tensor.concat(&[tensor1, tensor2], 0);
+    defer mat_c.d();
+    Console.print2("\n{s}:\n", .{"Tensor concat, dim=0"});
+    try mat_c.print();
+    var mat_d = try Tensor.concat(&[tensor1, tensor2], 1);
+    defer mat_d.d();
+    Console.print2("\n{s}:\n", .{"Tensor concat, dim=1"});
+    try mat_d.print();
+}
+test "Tensor: concat 2" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    var tensor1 = try Tensor.a(&mem, &[2, 2]);
+    defer tensor1.d();
+    tensor1.set(&[0, 0], 1.0);
+    tensor1.set(&[0, 1], 2.0);
+    tensor1.set(&[1, 0], 3.0);
+    tensor1.set(&[1, 1], 4.0);
+
+    var tensor2 = try Tensor.a(&mem, &[2, 2]);
+    defer tensor2.d();
+    tensor2.set(&[0, 0], 5.0);
+    tensor2.set(&[0, 1], 6.0);
+    tensor2.set(&[1, 0], 7.0);
+    tensor2.set(&[1, 1], 8.0);
+
+    var tensor3 = try Tensor.a(&mem, &[2, 2]);
+    defer tensor3.d();
+    tensor3.set(&[0, 0], 11.0);
+    tensor3.set(&[0, 1], 12.0);
+    tensor3.set(&[1, 0], 13.0);
+    tensor3.set(&[1, 1], 14.0);
+
+    var mat_c = try Tensor.concat(&[tensor1, tensor2, tensor3], 0);
+    defer mat_c.d();
+    Console.print2("\n{s}:\n", .{"Tensor concat 2, dim=0"});
+    try mat_c.print();
+    var mat_d = try Tensor.concat(&[tensor1, tensor2, tensor3], 1);
+    defer mat_d.d();
+    Console.print2("\n{s}:\n", .{"Tensor concat 2, dim=1"});
+    try mat_d.print();
+}
+test "Tensor: concat 3" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    // 2x2x2 tensor
+    const array1: [2][2][2]f32 = [
+        [
+            [ 1.0, 2.0 ],
+            [ 3.0, 4.0 ]
+        ],
+        [
+            [ 5.0, 6.0 ],
+            [ 7.0, 8.0 ]
+        ]
+    ];
+    var mat_a = try Tensor.a2(&mem, array1);
+    defer mat_a.d();
+
+    // 2x2x2 tensor
+    const array2: [2][2][2]f32 = [
+        [
+            [ 11.0, 12.0 ],
+            [ 13.0, 14.0 ]
+        ],
+        [
+            [ 15.0, 16.0 ],
+            [ 17.0, 18.0 ]
+        ]
+    ];
+    var mat_b = try Tensor.a2(&mem, array2);
+    defer mat_b.d();
+
+    var mat_c = try Tensor.concat(&[mat_a, mat_b], 0);
+    defer mat_c.d();
+    Console.print2("\n{s}:\n", .{"Tensor concat 3, dim=0"});
+    try mat_c.print();
+    var mat_d = try Tensor.concat(&[mat_a, mat_b], 1);
+    defer mat_d.d();
+    Console.print2("\n{s}:\n", .{"Tensor concat 3, dim=1"});
+    try mat_d.print();
+    var mat_e = try Tensor.concat(&[mat_a, mat_b], 2);
+    defer mat_e.d();
+    Console.print2("\n{s}:\n", .{"Tensor concat 3, dim=2"});
+    try mat_e.print();
+}
+
+test "Tensor: stack" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    var tensor1 = try Tensor.a(&mem, &[2, 2]);
+    defer tensor1.d();
+    tensor1.set(&[0, 0], 1.0);
+    tensor1.set(&[0, 1], 2.0);
+    tensor1.set(&[1, 0], 3.0);
+    tensor1.set(&[1, 1], 4.0);
+
+    var tensor2 = try Tensor.a(&mem, &[2, 2]);
+    defer tensor2.d();
+    tensor2.set(&[0, 0], 5.0);
+    tensor2.set(&[0, 1], 6.0);
+    tensor2.set(&[1, 0], 7.0);
+    tensor2.set(&[1, 1], 8.0);
+
+    var t5 = try Tensor.stack(&[tensor1, tensor2], 0);
+    defer t5.d();
+    Console.print2("\n{s}:\n", .{"Tensor stack, dim=0"});
+    try t5.print();
+    var t6 = try Tensor.stack(&[tensor1, tensor2], 1);
+    defer t6.d();
+    Console.print2("\n{s}:\n", .{"Tensor stack, dim=1"});
+    try t6.print();
+    var t7 = try Tensor.stack(&[tensor1, tensor2], 2);
+    defer t7.d();
+    Console.print2("\n{s}:\n", .{"Tensor stack, dim=2"});
+    try t7.print();
+}
+test "Tensor: stack 2" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    // 2x2 tensor
+    const array1: [2][2]f32 = [
+        [ 1.0, 2.0 ],
+        [ 3.0, 4.0 ]
+    ];
+    var mat_a = try Tensor.a2(&mem, array1);
+    defer mat_a.d();
+
+    // 2x2 tensor
+    const array2: [2][2]f32 = [
+        [ 5.0, 6.0 ],
+        [ 7.0, 8.0 ]
+    ];
+    var mat_b = try Tensor.a2(&mem, array2);
+    defer mat_b.d();
+
+    var mat_c = try Tensor.stack(&[mat_a, mat_b], 0);
+    defer mat_c.d();
+    Console.print2("\n{s}:\n", .{"Tensor stack 2, dim=0"});
+    try mat_c.print();
+    var mat_d = try Tensor.stack(&[mat_a, mat_b], 1);
+    defer mat_d.d();
+    Console.print2("\n{s}:\n", .{"Tensor stack 2, dim=1"});
+    try mat_d.print();
+    var mat_e = try Tensor.stack(&[mat_a, mat_b], 2);
+    defer mat_e.d();
+    Console.print2("\n{s}:\n", .{"Tensor stack 2, dim=2"});
+    try mat_e.print();
+}
+test "Tensor: stack 3" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    const array1: [3][3]f32 = [[1,2,3],[4,5,6],[7,8,9]];
+    var t1 = try Tensor.a2(&mem, array1);
+    defer t1.d();
+    const array2: [3][3]f32 = [[10,20,30],[40,50,60],[70,80,90]];
+    var t2 = try Tensor.a2(&mem, array2);
+    defer t2.d();
+    const array3: [3][3]f32 = [[100,200,300],[400,500,600],[700,800,900]];
+    var t3= try Tensor.a2(&mem, array3);
+    defer t3.d();
+    const array4: [3][3]f32 = [[1000,2000,3000],[4000,5000,6000],[7000,8000,9000]];
+    var t4 = try Tensor.a2(&mem, array4);
+    defer t4.d();
+
+    var t5 = try Tensor.stack(&[t1, t2, t3, t4], 0);
+    defer t5.d();
+    Console.print2("\n{s}:\n", .{"Tensor stack 3, dim=0"});
+    try t5.print();
+    var t6 = try Tensor.stack(&[t1, t2, t3, t4], 1);
+    defer t6.d();
+    Console.print2("\n{s}:\n", .{"Tensor stack 3, dim=1"});
+    try t6.print();
+    var t7 = try Tensor.stack(&[t1, t2, t3, t4], 2);
+    defer t7.d();
+    Console.print2("\n{s}:\n", .{"Tensor stack 3, dim=2"});
+    try t7.print();
+}
+
+test "Tensor: reShape" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    const array1: [8]f32 = [1,2,3,4,5,6,7,8];
+    var t1 = try Tensor.a2(&mem, array1);
+    defer t1.d();
+
+    var t5 = try t1.reShape(&[2, 2, 2]);
+    defer t5.d();
+    Console.print2("\n{s}:\n", .{"Tensor reShape"});
+    try t5.print();
+}
+test "Tensor: reShape 2" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    const array1: [2][2][2]f32 = [
+        [
+            [ 1.0, 2.0 ],
+            [ 3.0, 4.0 ]
+        ],
+        [
+            [ 5.0, 6.0 ],
+            [ 7.0, 8.0 ]
+        ]
+    ];
+    var t1 = try Tensor.a2(&mem, array1);
+    defer t1.d();
+
+    var t5 = try t1.reShape(&[8]);
+    defer t5.d();
+    Console.print2("\n{s}:\n", .{"Tensor reShape 2"});
+    try t5.print();
+}
+
+test "Tensor: view" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    const array1: [8]f32 = [1,2,3,4,5,6,7,8];
+    var t1 = try Tensor.a2(&mem, array1);
+    defer t1.d();
+
+    var t5 = try t1.view(&[2, 2, 2]);
+    defer t5.d();
+    Console.print2("\n{s}:\n", .{"Tensor view"});
+    try t5.print();
+}
+test "Tensor: view 2" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    const array1: [2][2][2]f32 = [
+        [
+            [ 1.0, 2.0 ],
+            [ 3.0, 4.0 ]
+        ],
+        [
+            [ 5.0, 6.0 ],
+            [ 7.0, 8.0 ]
+        ]
+    ];
+    var t1 = try Tensor.a2(&mem, array1);
+    defer t1.d();
+
+    var t5 = try t1.view(&[8]);
+    defer t5.d();
+    Console.print2("\n{s}:\n", .{"Tensor view 2"});
+    try t5.print();
+}
+
+test "Tensor: transpose" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    const array1: [2][2]f32 = [
+        [ 1.0, 2.0 ],
+        [ 3.0, 4.0 ]
+    ];
+    var t1 = try Tensor.a2(&mem, array1);
+    defer t1.d();
+
+
+    var t5 = try t1.transpose(&[1, 0]);
+    defer t5.d();
+    Console.print2("\n{s}:\n", .{"Tensor transpose"});
+    try t5.print();
+}
+
+test "Tensor: transpose 2" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    const array1: [3][3]f32 = [[1,2,3],[4,5,6],[7,8,9]];
+    var t1 = try Tensor.a2(&mem, array1);
+    defer t1.d();
+
+    var t5 = try t1.transpose(&[1, 0]);
+    defer t5.d();
+    Console.print2("\n{s}:\n", .{"Tensor transpose 2"});
+    try t5.print();
+}
+
+test "Tensor: transpose 3" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    const array1: [2][2][2]f32 = [
+        [
+            [ 1.0, 2.0 ],
+            [ 3.0, 4.0 ]
+        ],
+        [
+            [ 5.0, 6.0 ],
+            [ 7.0, 8.0 ]
+        ]
+    ];
+    var t1 = try Tensor.a2(&mem, array1);
+    defer t1.d();
+
+    var t5 = try t1.transpose(&[1, 0, 2]);
+    defer t5.d();
+    Console.print2("\n{s}:\n", .{"Tensor transpose 3"});
+    try t5.print();
+}

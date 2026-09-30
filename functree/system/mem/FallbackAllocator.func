@@ -1,0 +1,101 @@
+code(
+'''
+const std = @import("std");
+'''
+);
+
+pub const Allocator = std.mem.Allocator;
+pub const Alignment = std.mem.Alignment;
+pub const Stack = std.heap.FixedBufferAllocator;
+pub const HeapArena = std.heap.ArenaAllocator;
+
+code(
+'''
+    buffer: []u8,
+    fallback_allocator: HeapArena,
+    fixed_buffer_allocator: Stack,
+    single_thread: bool = false,
+    get_called: if (std.debug.runtime_safety) bool else void =
+        if (std.debug.runtime_safety) false else {},
+
+    /// This function both fetches a `Allocator` interface to this
+    /// allocator *and* resets the internal buffer allocator.
+    pub fn get(self: *FallbackAllocator) Allocator {
+        if (std.debug.runtime_safety) {
+            // assert(!self.get_called); // `get` called multiple times; instead use `const allocator = stackFallback(N).get();`
+            self.get_called = true;
+        }
+        self.fixed_buffer_allocator = Stack.init(self.buffer);
+        return .{
+            .ptr = self,
+            .vtable = &.{
+                .alloc = alloc,
+                .resize = resize,
+                .remap = remap,
+                .free = free,
+            },
+        };
+    }
+    fn getStackAllocator(self: *FallbackAllocator) Allocator {
+        if (self.single_thread) {
+            return self.fixed_buffer_allocator.allocator();
+        } else {
+            return self.fixed_buffer_allocator.threadSafeAllocator();
+        }
+    }
+
+    /// Unlike most std allocators `StackFallbackAllocator` modifies
+    /// its internal state before returning an implementation of
+    /// the`Allocator` interface and therefore also doesn't use
+    /// the usual `.allocator()` method.
+    pub const allocator = @compileError("use 'const allocator = stackFallback(N).get();' instead");
+
+    fn alloc(
+        ctx: *anyopaque,
+        len: usize,
+        alignment: Alignment,
+        ra: usize,
+    ) ?[*]u8 {
+        const self: *FallbackAllocator = @ptrCast(@alignCast(ctx));
+        return self.getStackAllocator().rawAlloc(len, alignment, ra) orelse
+            return self.fallback_allocator.allocator().rawAlloc(len, alignment, ra);
+    }
+
+    fn resize(
+        ctx: *anyopaque,
+        buf: []u8,
+        alignment: Alignment,
+        new_len: usize,
+        ra: usize,
+    ) bool {
+        const self: *FallbackAllocator = @ptrCast(@alignCast(ctx));
+        if (self.fixed_buffer_allocator.ownsPtr(buf.ptr)) {
+            return self.getStackAllocator().rawResize(buf, alignment, new_len, ra);
+        } else {
+            return self.fallback_allocator.allocator().rawResize(buf, alignment, new_len, ra);
+        }
+    }
+
+    fn remap(ctx: *anyopaque, buf: []u8, alignment: Alignment, new_len: usize, ret_addr: usize) ?[*]u8 {
+        const self: *FallbackAllocator = @ptrCast(@alignCast(ctx));
+        if (self.fixed_buffer_allocator.ownsPtr(buf.ptr)) {
+            return self.getStackAllocator().rawRemap(buf, alignment, new_len, ret_addr);
+        } else {
+            return self.fallback_allocator.allocator().rawRemap(buf, alignment, new_len, ret_addr);
+        }
+    }
+
+    fn free(
+        ctx: *anyopaque,
+        buf: []u8,
+        alignment: Alignment,
+        ra: usize,
+    ) void {
+        const self: *FallbackAllocator = @ptrCast(@alignCast(ctx));
+        if (self.fixed_buffer_allocator.ownsPtr(buf.ptr)) {
+            return self.getStackAllocator().rawFree(buf, alignment, ra);
+        } else {
+            return self.fallback_allocator.allocator().rawFree(buf, alignment, ra);
+        }
+    }
+''');

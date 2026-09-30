@@ -1,0 +1,66 @@
+const System = import("../../System.func");
+const Mem = System.Mem;
+const String = System.DataType.String;
+
+const FunctreeTest = import("../../Test.func");
+const expect = FunctreeTest.expect;
+const expectEqual = FunctreeTest.expectEqual;
+const expectEqualSlices = FunctreeTest.expectEqualSlices;
+const expectEqualStrings = FunctreeTest.expectEqualStrings;
+
+test "Mem: a Heap" {
+
+    // a Heap
+    var mem = Mem.a();
+    defer mem.d();
+
+    var string = try String.a(&mem, "abc,def,ghi");
+    // free String memory manually
+    defer string.d();
+
+    const _str = try String.copyStr(&mem, string.toStr());
+    // free str memory manually
+    defer mem.free2(_str);
+
+    try expect(String.equalStr(_str, "abc,def,ghi"));
+}
+
+test "Mem: a Heap, auto free" {
+
+    // a Heap
+    var mem = Mem.a();
+    // auto free memory
+    mem.f();
+    defer mem.d();
+
+    const string = try String.a(&mem, "abc,def,ghi");
+    const string_upper = try string.upper();
+
+    try expect(String.equalStr(string_upper.toStr(), "ABC,DEF,GHI"));
+}
+
+test "Mem: a Stack" {
+
+    // a Stack, not need free memory manually
+    var buffer: [300]u8 = undefined;
+    var mem = Mem.as(&buffer);
+
+    const string = try String.a(&mem, "abc,def,ghi");
+    const string_upper = try string.upper();
+
+    try expect(String.equalStr(string_upper.toStr(), "ABC,DEF,GHI"));
+}
+
+test "Mem: a StackFallbackHeap" {
+    var buffer: [1]u8 = undefined;
+    // a Heap
+    var mem = Mem.a();
+    // a StackFallbackHeap memory, auto free memory
+    mem.s(&buffer);
+    defer mem.d();
+
+    var string = try String.a(&mem, "abc,def,ghi");
+    const string_upper = try string.upper();
+
+    try expect(String.equalStr(string_upper.toStr(), "ABC,DEF,GHI"));
+}

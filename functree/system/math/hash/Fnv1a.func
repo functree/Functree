@@ -1,0 +1,34 @@
+code(
+'''
+const std = @import("std");
+
+pub fn fnv1a(comptime T: type, comptime prime: T, comptime offset: T) type {
+    return struct {
+        const Self = @This();
+
+        value: T,
+
+        pub fn a() Self {
+            return Self{ .value = offset };
+        }
+
+        pub fn update(self: *Self, input: []const u8) void {
+            for (input) |b| {
+                self.value ^= b;
+                self.value *%= prime;
+            }
+        }
+
+        pub fn final(self: *Self) T {
+            return self.value;
+        }
+
+        pub fn hash(input: []const u8) T {
+            var c = Self.init();
+            c.update(input);
+            return c.final();
+        }
+    };
+}
+'''
+);

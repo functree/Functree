@@ -1,0 +1,72 @@
+pub const DataType = import("system/DataType.func");
+pub const Io = import("system/Io.func");
+const Console = Io.Console;
+pub const Math = import("system/Math.func");
+pub const Mem = import("system/Mem.func");
+pub const Process = import("system/Process.func");
+pub const Timer = import("system/Timer.func");
+
+pub const Cpu = import("system/Cpu.func");
+pub const Os = import("system/Os.func");
+
+code(
+'''
+const std = @import("std");
+const builtin = @import("builtin");
+'''
+);
+
+cpu: Cpu,
+os: Os,
+abi: Os.Abi,
+ofmt: Os.ObjectFormat,
+
+pub fn getTotalMemory() !u64 {
+    return try std.process.totalSystemMemory();
+}
+
+pub fn getOs() Os {
+    const os = Os{
+        .tag = builtin.os.tag,
+        .version_range = builtin.os.version_range,
+    };
+    return os;
+}
+
+pub fn getAbi() Os.Abi {
+    return builtin.abi;
+}
+
+pub fn getObjectFormat(os_tag: Os.Tag, arch: Cpu.Arch) Os.ObjectFormat {
+    return std.Target.ObjectFormat.default(os_tag, arch);
+}
+
+pub fn getCpu() Cpu {
+    const cpu = Cpu{
+        .arch = builtin.cpu.arch,
+        .features = builtin.cpu.features,
+    };
+    return cpu;
+}
+
+pub fn getCpuCount() !usize {
+    return try std.Thread.getCpuCount();
+}
+
+pub fn isTest() bool {
+    return builtin.is_test;
+}
+
+pub fn main(init: std.process.Init) !void {
+    const memory_size = try System.getTotalMemory();
+    Console.print2("memory_size={d}\n", .{memory_size});
+
+    const cpu_count = try System.getCpuCount();
+    Console.print2("cpu_count={d}\n", .{cpu_count});
+
+    var env_map = init.environ_map;
+    var iter = env_map.iterator();
+    while (pair in iter.next()) {
+        Console.print2("{s} = {s}\n", .{pair.key_ptr.*, pair.value_ptr.*});
+    }
+}

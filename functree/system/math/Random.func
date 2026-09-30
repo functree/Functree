@@ -1,0 +1,71 @@
+const Mem = import("../Mem.func");
+
+code(
+'''
+const std = @import("std");
+'''
+);
+
+random: std.Random,
+
+/// get a Random
+pub fn a() Random {
+    return Random {
+        .random = std.Random.DefaultPrng.init(0).random(),
+    };
+}
+/// deinit a Random
+pub fn d(self: *Random) void {
+    self.* = undefined;
+}
+
+/// Returns an evenly distributed random integer `at_least <= i < less_than`.
+/// See `uintLessThan`, which this function uses in most cases,
+/// for commentary on the runtime of this function.
+pub fn int(self: Random, comptime T: type, at_least: T, less_than: T) T {
+    return self.random.intRangeLessThan(T, at_least, less_than);
+}
+/// Returns an evenly distributed random integer `at_least <= i <= at_most`.
+/// See `uintLessThan`, which this function uses in most cases,
+/// for commentary on the runtime of this function.
+pub fn int2(self: Random, comptime T: type, at_least: T, at_most: T) T {
+    return self.random.intRangeAtMost(T, at_least, at_most);
+}
+
+/// Returns an evenly distributed random unsigned integer `0 <= i < less_than`.
+/// This function assumes that the underlying `fillFn` produces evenly distributed values.
+/// Within this assumption, the runtime of this function is exponentially distributed.
+/// If `fillFn` were backed by a true random generator,
+/// the runtime of this function would technically be unbounded.
+/// However, if `fillFn` is backed by any evenly distributed pseudo random number generator,
+/// this function is guaranteed to return.
+/// If you need deterministic runtime bounds, use `uintLessThanBiased`.
+pub fn uint(self: Random, comptime T: type, less_than: T) T {
+    return self.random.uintLessThan(T, less_than);
+}
+/// Returns an evenly distributed random unsigned integer `0 <= i <= at_most`.
+/// See `uintLessThan`, which this function uses in most cases,
+/// for commentary on the runtime of this function.
+pub fn uint2(self: Random, comptime T: type, at_most: T) T {
+    return self.random.uintAtMost(T, at_most);
+}
+
+/// Return a floating point value evenly distributed in the range [0, 1).
+pub fn float(self: Random, comptime T: type) T {
+    return self.random.float(T);
+}
+
+/// Obtains cryptographically secure entropy from outside the process.
+///
+/// Always makes a syscall, or otherwise avoids dependency on process memory,
+/// in order to obtain fresh randomness. Does not rely on stored RNG state.
+///
+/// Does not have any fallback mechanisms; returns `error.EntropyUnavailable`
+/// if any problems occur.
+///
+/// Threadsafe.
+///
+/// See also `random`.
+pub fn randomBuf(mem: *Mem, buffer: []u8) !void {
+    return try std.Io.randomSecure(mem.io(), buffer);
+}

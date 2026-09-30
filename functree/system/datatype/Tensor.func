@@ -1,0 +1,890 @@
+const Mem = import("../Mem.func");
+
+code(
+'''
+const std = @import("std");
+const math = std.math;
+const Allocator = std.mem.Allocator;
+
+data: []f32,
+shape: []usize,         // dim size, [2,3,4]
+stride: []usize,
+mem: *Mem,
+
+//---------------------- init and deinit ----------------------
+/// create Tensor witch shape
+pub fn a(mem: *Mem, shape: []const usize) !Tensor {
+    // 1. calculate total_elements and stride
+    const total_elements = blk: {
+        var product: usize = 1;
+        for (shape) |dim| product *= dim;
+        break :blk product;
+    };
+    const allocator = mem.allocator();
+    const stride = try calculateStrides(allocator, shape);
+
+    // 2. assign data
+    const data = try allocator.alloc(f32, total_elements);
+    @memset(data, 0);
+
+    return .{
+        .data = data,
+        .shape = try allocator.dupe(usize, shape),
+        .stride = stride,
+        .mem = mem,
+    };
+}
+
+/// create Tensor with array
+pub fn a2(mem: *Mem, array: anytype) !Tensor {
+    const shape = try inferShape(mem.allocator(), array);
+    var tensor = try a(mem, shape);
+    try tensor.fillTensor(array);
+    return tensor;
+}
+
+/// free memory
+pub fn d(self: *Tensor) void {
+    const allocator = self.mem.allocator();
+    allocator.free(self.shape);
+    allocator.free(self.stride);
+    allocator.free(self.data);
+}
+
+/// create Tensor with rand
+pub fn rand(mem: *Mem, shape: []const usize) !Tensor {
+    var prng = std.Random.DefaultPrng.init(0);
+    const random = prng.random();
+    const tensor = try a(mem, shape);
+    for (0..tensor.data.len) |i| {
+        tensor.data[i] = createRandomFloat(random);
+    }
+    return tensor;
+}
+
+/// recursive Fill Tensor. 
+/// must create Tensor with shape parameter, and then call fillTensor
+pub fn fillTensor(self: *Tensor, array: anytype) !void {
+    const allocator = self.mem.allocator();
+    const indices = try allocator.alloc(usize, self.shape.len);
+    defer allocator.free(indices);
+    @memset(indices, 0);
+    self.recursiveFill(array, indices, 0);
+}
+
+//---------------------- access element ----------------------
+/// get element by a slice
+pub fn get(self: *const Tensor, indices: []const usize) f32 {
+    return self.data[self.linearIndex(indices)];
+}
+
+/// set element by a slice
+pub fn set(self: *Tensor, indices: []const usize, value: f32) void {
+    self.data[self.linearIndex(indices)] = value;
+}
+
+/// Create Tensor with new shapge, will copy data
+pub fn reShape(self: *Tensor, shape: []const usize) !Tensor {
+    var data_len: usize = 0;
+    for (shape) |val| {
+        if (data_len != 0) {
+            data_len *= val;
+        } else {
+            data_len = val;
+        }
+    }
+    if (data_len != self.data.len) return error.NewShapeNoMatch;
+
+    const allocator = self.mem.allocator();
+    const data = try allocator.alloc(f32, self.data.len);
+    @memcpy(data[0..], self.data[0..]);
+
+    const stride = try calculateStrides(allocator, shape);
+
+    return .{
+        .data = data,
+        .shape = try allocator.dupe(usize, shape),
+        .stride = stride,
+        .mem = self.mem,
+    };
+}
+
+/// Tensor view with new shapge, no copy data
+pub fn view(self: *Tensor, shape: []const usize) !Tensor {
+    var data_len: usize = 0;
+    for (shape) |val| {
+        if (data_len != 0) {
+            data_len *= val;
+        } else {
+            data_len = val;
+        }
+    }
+    if (data_len != self.data.len) return error.NewShapeNotMatch;
+
+    const allocator = self.mem.allocator();
+    const stride = try calculateStrides(allocator, shape);
+
+    return .{
+        .data = self.data,
+        .shape = try allocator.dupe(usize, shape),
+        .stride = stride,
+        .mem = self.mem,
+    };
+}
+
+/// transpose Tensor dim, will copy data
+pub fn transpose(self: *Tensor, dim_index_slice: []const usize) !Tensor {
+    if (dim_index_slice.len != self.shape.len) return error.WrongDimSliceLen;
+    for (dim_index_slice) |dim| {
+        if (dim > self.shape.len - 1) return error.WrongDimIndex;
+    }
+
+    const allocator = self.mem.allocator();
+    const data = try allocator.alloc(f32, self.data.len);
+    @memcpy(data[0..], self.data[0..]);
+
+    const shape = try allocator.alloc(usize, self.shape.len);
+    const stride = try allocator.alloc(usize, self.stride.len);
+    for (dim_index_slice, 0..) |val, i| {
+        shape[i] = self.shape[val];
+        stride[i] = self.stride[val];
+    }
+
+    return .{
+        .data = data,
+        .shape = shape,
+        .stride = stride,
+        .mem = self.mem,
+    };
+}
+
+
+//---------------------- print tensor ----------------------
+pub fn print(self: *const Tensor) !void {
+    const allocator = self.mem.allocator();
+    std.debug.print("\nShape: {any}", .{self.shape});
+    const indices = try allocator.alloc(usize, self.shape.len);
+    defer allocator.free(indices);
+    @memset(indices, 0);
+    printRecursive(self, indices, 0);
+    std.debug.print("\n", .{});
+}
+
+fn printRecursive(self: *const Tensor, indices: []usize, depth: usize) void {
+    const prefix_space: []const u8 = self.getPrefixSpace(depth);
+    if (depth == self.shape.len - 1) {
+        std.debug.print("\n{s}[", .{prefix_space});
+        for (0..self.shape[depth]) |i| {
+            indices[depth] = i;
+            if (i != 0) std.debug.print(" ", .{});
+            if (i == self.shape[depth] - 1) {
+                std.debug.print("{d:.1}", .{self.get(indices)});
+            } else {
+                std.debug.print("{d:.1},", .{self.get(indices)});
+            }
+        }
+        if (depth == 0 or indices[depth - 1] == self.shape[depth - 1] - 1) {
+            std.debug.print("]", .{});
+        } else {
+            std.debug.print("],", .{});
+        }
+    } else {
+        std.debug.print("\n{s}[", .{prefix_space});
+        for (0..self.shape[depth]) |i| {
+            indices[depth] = i;
+            self.printRecursive(indices, depth + 1);
+        }
+        if (depth != 0 and indices[depth - 1] != self.shape[depth - 1] - 1) {
+            std.debug.print("\n{s}],", .{prefix_space});
+        } else {
+            std.debug.print("\n{s}]", .{prefix_space});
+        }
+    }
+}
+fn getPrefixSpace(self: *const Tensor, depth: usize) []const u8 {
+    var prefix_space: []const u8 = "";
+    var count: usize = 0;
+    while (count < depth) {
+        prefix_space = std.mem.concat(self.mem.allocator(), u8, &.{ prefix_space, "  " }) catch return prefix_space;
+        count += 1;
+    }
+    return prefix_space;
+}
+fn printRecursive2(self: *const Tensor, indices: []usize, depth: usize) void {
+    if (depth == self.shape.len - 1) {
+        for (0..self.shape[depth]) |i| {
+            indices[depth] = i;
+            std.debug.print("indices={any}, value={d:.7}\n", .{indices, self.get(indices)});
+        }
+    } else {
+        for (0..self.shape[depth]) |i| {
+            indices[depth] = i;
+            self.printRecursive2(indices, depth + 1);
+        }
+    }
+}
+
+//---------------------- calculate ----------------------
+/// Tensor add constant
+pub fn add(t1: Tensor, constant: f32) !Tensor {
+    const result = try Tensor.a(t1.mem, t1.shape);
+    for (t1.data, 0..) |v1, i| {
+        result.data[i] = v1 + constant;
+    }
+
+    return result;
+}
+/// Tensor sub constant
+pub fn sub(t1: Tensor, constant: f32) !Tensor {
+    const result = try Tensor.a(t1.mem, t1.shape);
+    for (t1.data, 0..) |v1, i| {
+        result.data[i] = v1 - constant;
+    }
+
+    return result;
+}
+/// Tensor mul constant
+pub fn mul(t1: Tensor, constant: f32) !Tensor {
+    const result = try Tensor.a(t1.mem, t1.shape);
+    for (t1.data, 0..) |v1, i| {
+        result.data[i] = v1 * constant;
+    }
+
+    return result;
+}
+/// Tensor div constant
+pub fn div(t1: Tensor, constant: f32) !Tensor {
+    const result = try Tensor.a(t1.mem, t1.shape);
+    for (t1.data, 0..) |v1, i| {
+        result.data[i] = v1 / constant;
+    }
+
+    return result;
+}
+/// Tensor pow constant
+pub fn pow(t1: Tensor, constant: f32) !Tensor {
+    const result = try Tensor.a(t1.mem, t1.shape);
+    for (t1.data, 0..) |v1, i| {
+        result.data[i] = std.math.pow(f32, v1, constant);
+    }
+
+    return result;
+}
+
+/// Tensor add Tensor, seam shape
+pub fn addTensor(t1: Tensor, t2: Tensor) !Tensor {
+    if (!std.mem.eql(usize, t1.shape, t2.shape)) return error.ShapeNotMatch;
+
+    const result = try Tensor.a(t1.mem, t1.shape);
+
+    for (t1.data, t2.data, 0..) |v1, v2, i| {
+        result.data[i] = v1 + v2;
+    }
+
+    return result;
+}
+/// Tensor sub Tensor, seam shape
+pub fn subTensor(t1: Tensor, t2: Tensor) !Tensor {
+    if (!std.mem.eql(usize, t1.shape, t2.shape)) return error.ShapeNotMatch;
+
+    const result = try Tensor.a(t1.mem, t1.shape);
+
+    for (t1.data, t2.data, 0..) |v1, v2, i| {
+        result.data[i] = v1 - v2;
+    }
+
+    return result;
+}
+/// Tensor mul Tensor, seam shape
+pub fn mulTensor(t1: Tensor, t2: Tensor) !Tensor {
+    if (!std.mem.eql(usize, t1.shape, t2.shape)) return error.ShapeNotMatch;
+
+    const result = try Tensor.a(t1.mem, t1.shape);
+
+    for (t1.data, t2.data, 0..) |v1, v2, i| {
+        result.data[i] = v1 * v2;
+    }
+
+    return result;
+}
+/// Tensor div Tensor, seam shape
+pub fn divTensor(t1: Tensor, t2: Tensor) !Tensor {
+    if (!std.mem.eql(usize, t1.shape, t2.shape)) return error.ShapeNotMatch;
+
+    const result = try Tensor.a(t1.mem, t1.shape);
+
+    for (t1.data, t2.data, 0..) |v1, v2, i| {
+        result.data[i] = v1 / v2;
+    }
+
+    return result;
+}
+/// Tensor pow Tensor, seam shape
+pub fn powTensor(t1: Tensor, t2: Tensor) !Tensor {
+    if (!std.mem.eql(usize, t1.shape, t2.shape)) return error.ShapeNotMatch;
+
+    const result = try Tensor.a(t1.mem, t1.shape);
+
+    for (t1.data, t2.data, 0..) |v1, v2, i| {
+        result.data[i] = std.math.pow(f32, v1, v2);
+    }
+
+    return result;
+}
+
+
+/// Tensor add2 Tensor, broadcast shapes
+pub fn addTensor2(t1: Tensor, t2: Tensor) !Tensor {
+    const allocator = t1.mem.allocator();
+    const new_shape = try broadcastShapes(t1.shape, t2.shape, allocator);
+    var result = try Tensor.a(t1.mem, new_shape);
+
+    const indices = try allocator.alloc(usize, new_shape.len);
+    defer allocator.free(indices);
+    @memset(indices, 0);
+    try addRecursive(t1, t2, &result, indices, 0);
+
+    return result;
+}
+fn addRecursive(t1: Tensor, t2: Tensor, result: *Tensor, indices: []usize, depth: usize) !void {
+    if (depth == result.shape.len) {
+        const a_val = t1.get(indices);
+        const b_val = t2.get(indices);
+        result.set(indices, a_val + b_val);
+    } else {
+        for (0..result.shape[depth]) |i| {
+            indices[depth] = i;
+            try addRecursive(t1, t2, result, indices, depth + 1);
+        }
+    }
+}
+/// Tensor sub2 Tensor, broadcast shapes
+pub fn subTensor2(t1: Tensor, t2: Tensor) !Tensor {
+    const allocator = t1.mem.allocator();
+    const new_shape = try broadcastShapes(t1.shape, t2.shape, allocator);
+    var result = try Tensor.a(t1.mem, new_shape);
+
+    const indices = try allocator.alloc(usize, new_shape.len);
+    defer allocator.free(indices);
+    @memset(indices, 0);
+    try subRecursive(t1, t2, &result, indices, 0);
+
+    return result;
+}
+fn subRecursive(t1: Tensor, t2: Tensor, result: *Tensor, indices: []usize, depth: usize) !void {
+    if (depth == result.shape.len) {
+        const a_val = t1.get(indices);
+        const b_val = t2.get(indices);
+        result.set(indices, a_val - b_val);
+    } else {
+        for (0..result.shape[depth]) |i| {
+            indices[depth] = i;
+            try subRecursive(t1, t2, result, indices, depth + 1);
+        }
+    }
+}
+/// Tensor mul Tensor 2, broadcast shapes
+pub fn mulTensor2(t1: Tensor, t2: Tensor) !Tensor {
+    const allocator = t1.mem.allocator();
+    const new_shape = try broadcastShapes(t1.shape, t2.shape, allocator);
+    var result = try Tensor.a(t1.mem, new_shape);
+
+    const indices = try allocator.alloc(usize, new_shape.len);
+    defer allocator.free(indices);
+    @memset(indices, 0);
+    try mulRecursive(t1, t2, &result, indices, 0);
+
+    return result;
+}
+fn mulRecursive(t1: Tensor, t2: Tensor, result: *Tensor, indices: []usize, depth: usize) !void {
+    if (depth == result.shape.len) {
+        const a_val = t1.get(indices);
+        const b_val = t2.get(indices);
+        result.set(indices, a_val * b_val);
+    } else {
+        for (0..result.shape[depth]) |i| {
+            indices[depth] = i;
+            try mulRecursive(t1, t2, result, indices, depth + 1);
+        }
+    }
+}
+/// Tensor div2 Tensor, broadcast shapes
+pub fn divTensor2(t1: Tensor, t2: Tensor) !Tensor {
+    const allocator = t1.mem.allocator();
+    const new_shape = try broadcastShapes(t1.shape, t2.shape, allocator);
+    var result = try Tensor.a(t1.mem, new_shape);
+
+    const indices = try allocator.alloc(usize, new_shape.len);
+    defer allocator.free(indices);
+    @memset(indices, 0);
+    try divRecursive(t1, t2, &result, indices, 0);
+
+    return result;
+}
+fn divRecursive(t1: Tensor, t2: Tensor, result: *Tensor, indices: []usize, depth: usize) !void {
+    if (depth == result.shape.len) {
+        const a_val = t1.get(indices);
+        const b_val = t2.get(indices);
+        result.set(indices, a_val / b_val);
+    } else {
+        for (0..result.shape[depth]) |i| {
+            indices[depth] = i;
+            try divRecursive(t1, t2, result, indices, depth + 1);
+        }
+    }
+}
+/// Tensor pow2 Tensor, broadcast shapes
+pub fn powTensor2(t1: Tensor, t2: Tensor) !Tensor {
+    const allocator = t1.mem.allocator();
+    const new_shape = try broadcastShapes(t1.shape, t2.shape, allocator);
+    var result = try Tensor.a(t1.mem, new_shape);
+
+    const indices = try allocator.alloc(usize, new_shape.len);
+    defer allocator.free(indices);
+    @memset(indices, 0);
+    try powRecursive(t1, t2, &result, indices, 0);
+
+    return result;
+}
+fn powRecursive(t1: Tensor, t2: Tensor, result: *Tensor, indices: []usize, depth: usize) !void {
+    if (depth == result.shape.len) {
+        const a_val = t1.get(indices);
+        const b_val = t2.get(indices);
+        result.set(indices, std.math.pow(f32, a_val, b_val));
+    } else {
+        for (0..result.shape[depth]) |i| {
+            indices[depth] = i;
+            try powRecursive(t1, t2, result, indices, depth + 1);
+        }
+    }
+}
+
+/// muttrix mulTensor
+pub fn matMul(t1: Tensor, t2: Tensor) !Tensor {
+    if (t1.shape.len < 2 or t2.shape.len < 2) return error.InvalidDimension;
+    const a_rows = t1.shape[t1.shape.len - 2];
+    const a_cols = t1.shape[t1.shape.len - 1];
+    const b_rows = t2.shape[t2.shape.len - 2];
+    const b_cols = t2.shape[t2.shape.len - 1];
+    if (a_cols != b_rows) return error.ShapeNotMatch;
+
+    const allocator = t1.mem.allocator();
+    // calculate dim
+    const batch_dims = t1.shape[0 .. t1.shape.len - 2];
+    const new_shape = try allocator.alloc(usize, batch_dims.len + 2);
+    @memcpy(new_shape[0..batch_dims.len], batch_dims);
+    new_shape[new_shape.len - 2] = a_rows;
+    new_shape[new_shape.len - 1] = b_cols;
+
+    var result = try Tensor.a(t1.mem, new_shape);
+
+    const batch_indices = try allocator.alloc(usize, batch_dims.len);
+    defer allocator.free(batch_indices);
+    @memset(batch_indices, 0);
+    try matMulRecursive(t1, t2, &result, batch_indices, 0);
+
+    return result;
+}
+fn matMulRecursive(t1: Tensor, t2: Tensor, result: *Tensor, batch_indices: []usize, depth: usize) !void {
+    if (depth == batch_indices.len) {
+        const a_rows = t1.shape[t1.shape.len - 2];
+        const b_cols = t2.shape[t2.shape.len - 1];
+        const a_cols = t1.shape[t1.shape.len - 1];
+
+        const allocator = t1.mem.allocator();
+        for (0..a_rows) |i| {
+            for (0..b_cols) |j| {
+                var _sum: f32 = 0;
+                for (0..a_cols) |k| {
+                    const a_idx = try std.mem.concat(allocator, usize, &.{batch_indices, &[_]usize{ i, k }});
+                    const b_idx = try std.mem.concat(allocator, usize, &.{batch_indices, &[_]usize{ k, j }});
+                    _sum += t1.get(a_idx) * t2.get(b_idx);
+                }
+                const result_idx = try std.mem.concat(allocator, usize, &.{batch_indices, &[_]usize{ i, j }});
+                result.set(result_idx, _sum);
+            }
+        }
+    } else {
+        for (0..t1.shape[depth]) |i| {
+            batch_indices[depth] = i;
+            try matMulRecursive(t1, t2, result, batch_indices, depth + 1);
+        }
+    }
+}
+
+/// Tensor sum all elements
+pub fn sum(self: Tensor) f32 {
+    var _sum: f32 = 0;
+    for (self.data) |val| {
+        _sum += val;
+    }
+    return _sum;
+}
+/// Tensor sum elements of one dim
+pub fn sum2(self: Tensor, dim_slice: []const isize) !f32 {
+    const allocator = self.mem.allocator();
+    var indices = try allocator.alloc(usize, dim_slice.len);
+    defer allocator.free(indices);
+    var sum_dim_list: std.ArrayList(usize) = .empty;
+    defer sum_dim_list.deinit(allocator);
+    for (0..self.shape.len) |dim_index| {
+        if (dim_slice[dim_index] >= 0) {
+            try sum_dim_list.append(allocator, dim_index);
+            indices[dim_index] = @as(usize, @intCast(dim_slice[dim_index]));
+        } else {
+            indices[dim_index] = 0;
+        }
+    }
+    if (sum_dim_list.items.len != 1) {
+        return error.OnlyAllowOneDim;
+    }
+
+    const _sum = self.sumRecursive(sum_dim_list.items[0], indices, 0);
+    return _sum;
+}
+fn sumRecursive(self: Tensor, sum_dim: usize, indices: []usize, next_dim: usize) f32 {
+    var _sum: f32 = 0;
+    for (next_dim..self.shape.len) |dim_index| {
+        if (sum_dim != dim_index) {
+            for (0..self.shape[dim_index]) |i| {
+                indices[dim_index] = i;
+                if (dim_index < self.shape.len - 1) {
+                    _sum += self.sumRecursive(sum_dim, indices, dim_index+1);
+                } else {
+                    _sum += self.get(indices);
+                }
+            }
+            break;
+        } else if (dim_index == self.shape.len - 1) {
+            _sum += self.get(indices);
+        }
+    }
+    return _sum;
+}
+
+/// Tensor mean all elements
+pub fn mean(self: Tensor) f32 {
+    const _sum = self.sum();
+    return _sum/@as(f32, @floatFromInt(self.data.len));
+}
+/// Tensor _mean elements of one dim
+pub fn mean2(self: Tensor, dim_slice: []const isize) !f32 {
+    const _sum = try self.sum2(dim_slice);
+    var dim_data_len: usize = undefined;
+    for (0..self.shape.len) |dim_index| {
+        if (dim_slice[dim_index] >= 0) {
+            dim_data_len = self.shape[dim_index];
+            break;
+        }
+    }
+
+    return _sum/@as(f32, @floatFromInt(dim_data_len));
+}
+
+/// max form all elements
+pub fn max(self: Tensor) f32 {
+    var _max: f32 = 0; // std.math.floatMin(f32);
+    for (self.data) |val| {
+        if (val > _max) {
+            _max = val;
+        }
+    }
+    return _max;
+}
+/// max from elements of one dim
+pub fn max2(self: Tensor, dim_slice: []const isize) !f32 {
+    const allocator = self.mem.allocator();
+    var indices = try allocator.alloc(usize, dim_slice.len);
+    defer allocator.free(indices);
+    var max_dim_list: std.ArrayList(usize) = .empty;
+    defer max_dim_list.deinit(allocator);
+    for (0..self.shape.len) |dim_index| {
+        if (dim_slice[dim_index] >= 0) {
+            try max_dim_list.append(allocator, dim_index);
+            indices[dim_index] = @as(usize, @intCast(dim_slice[dim_index]));
+        } else {
+            indices[dim_index] = 0;
+        }
+    }
+    if (max_dim_list.items.len != 1) {
+        return error.OnlyAllowOneDim;
+    }
+
+    const _max = self.maxRecursive(max_dim_list.items[0], indices, 0);
+    return _max;
+}
+fn maxRecursive(self: Tensor, max_dim: usize, indices: []usize, next_dim: usize) f32 {
+    var _max: f32 = 0;
+    for (next_dim..self.shape.len) |dim_index| {
+        if (max_dim != dim_index) {
+            for (0..self.shape[dim_index]) |i| {
+                indices[dim_index] = i;
+                var val: f32 = 0;
+                if (dim_index < self.shape.len - 1) {
+                    val = self.maxRecursive(max_dim, indices, dim_index+1);
+                } else {
+                    val = self.get(indices);
+                }
+                if (val > _max) {
+                    _max = val;
+                }
+            }
+            break;
+        } else if (dim_index == self.shape.len - 1) {
+            const val = self.get(indices);
+            if (val > _max) {
+                _max = val;
+            }
+        }
+    }
+    return _max;
+}
+
+/// min form all elements
+pub fn min(self: Tensor) f32 {
+    var _min: f32 = std.math.floatMax(f32);
+    for (self.data) |val| {
+        if (val < _min) {
+            _min = val;
+        }
+    }
+    return _min;
+}
+/// min from elements of one dim
+pub fn min2(self: Tensor, dim_slice: []const isize) !f32 {
+    const allocator = self.mem.allocator();
+    var indices = try allocator.alloc(usize, dim_slice.len);
+    defer allocator.free(indices);
+    var min_dim_list: std.ArrayList(usize) = .empty;
+    defer min_dim_list.deinit(allocator);
+    for (0..self.shape.len) |dim_index| {
+        if (dim_slice[dim_index] >= 0) {
+            try min_dim_list.append(allocator, dim_index);
+            indices[dim_index] = @as(usize, @intCast(dim_slice[dim_index]));
+        } else {
+            indices[dim_index] = 0;
+        }
+    }
+    if (min_dim_list.items.len != 1) {
+        return error.OnlyAllowOneDim;
+    }
+
+    const _min = self.minRecursive(min_dim_list.items[0], indices, 0);
+    return _min;
+}
+fn minRecursive(self: Tensor, min_dim: usize, indices: []usize, next_dim: usize) f32 {
+    const max_float = std.math.floatMax(f32);
+    var _min: f32 = max_float;
+    for (next_dim..self.shape.len) |dim_index| {
+        if (min_dim != dim_index) {
+            for (0..self.shape[dim_index]) |i| {
+                indices[dim_index] = i;
+                var val: f32 = max_float;
+                if (dim_index < self.shape.len - 1) {
+                    val = self.minRecursive(min_dim, indices, dim_index+1);
+                } else {
+                    val = self.get(indices);
+                }
+                if (val < _min) {
+                    _min = val;
+                }
+            }
+            break;
+        } else if (dim_index == self.shape.len - 1) {
+            const val = self.get(indices);
+            if (val < _min) {
+                _min = val;
+            }
+        }
+    }
+    return _min;
+}
+
+//---------------------- concat ----------------------
+/// many Tensor concat, seam shape, 0 <= dim <= t1.shape.len - 1
+pub fn concat(tensors: []const Tensor, dim: usize) !Tensor {
+    const t1 = tensors[0];
+    if (dim < 0 or dim > t1.shape.len - 1) return error.InvalidDimension;
+    for (0..tensors.len - 1) |i| {
+        if (!std.mem.eql(usize, tensors[i].shape, tensors[i + 1].shape)) return error.ShapeNotMatch;
+    }
+
+    const allocator = t1.mem.allocator();
+    const source_shape = tensors[0].shape;
+    const new_shape = try allocator.dupe(usize, source_shape);
+    new_shape[dim] = 0;
+    for (tensors) |tensor| {
+        new_shape[dim] += tensor.shape[dim];
+    }
+
+    var result = try Tensor.a(t1.mem, new_shape);
+
+    var offset: usize = 0;
+    if (dim == 0) {
+        for (tensors) |tensor| {
+            @memcpy(result.data[offset..offset + tensor.data.len], tensor.data[0..]);
+            offset += tensor.data.len;
+        }
+    } else {
+        for (tensors) |tensor| {
+            var indices = try allocator.alloc(usize, new_shape.len);
+            defer allocator.free(indices);
+            @memset(indices, 0);
+            indices[dim] = offset;
+
+            try concatRecursive(&result, tensor, indices, 0, dim, offset);
+            offset += tensor.shape[dim];
+        }
+    }
+
+    return result;
+}
+fn concatRecursive(result: *Tensor, source: Tensor, indices: []usize, depth: usize, dim: usize, offset: usize) !void {
+    if (depth == source.shape.len) {
+        const allocator = source.mem.allocator();
+        var source_indices = try allocator.alloc(usize, source.shape.len);
+        defer allocator.free(source_indices);
+        @memcpy(source_indices[0..], indices[0..]);
+        source_indices[dim] -= offset;
+
+        const value = source.get(source_indices);
+        result.set(indices, value);
+    } else {
+        for (0..source.shape[depth]) |i| {
+            if (depth == dim) {
+                indices[dim] = offset + i;
+            } else {
+                indices[depth] = i;
+            }
+            try concatRecursive(result, source, indices, depth + 1, dim, offset);
+        }
+    }
+}
+/// many Tensors stack, seam shape, 0 <= dim <= tensor.shape.len
+pub fn stack(tensors: []const Tensor, dim: usize) !Tensor {
+    const t1 = tensors[0];
+    if (dim < 0 or dim > t1.shape.len) return error.InvalidDimension;
+    for (0..tensors.len - 1) |i| {
+        if (!std.mem.eql(usize, tensors[i].shape, tensors[i + 1].shape)) return error.ShapeNotMatch;
+    }
+
+    const allocator = t1.mem.allocator();
+    const source_shape = t1.shape;
+    const new_shape = try allocator.alloc(usize, source_shape.len + 1);
+    for (0..dim) |i| new_shape[i] = source_shape[i];
+    new_shape[dim] = tensors.len;
+    for (dim..source_shape.len) |i| new_shape[i + 1] = source_shape[i];
+
+    var result = try Tensor.a(t1.mem, new_shape);
+
+    for (tensors, 0..) |tensor, i| {
+        var indices = try allocator.alloc(usize, new_shape.len);
+        defer allocator.free(indices);
+        @memset(indices, 0);
+        indices[dim] = i;
+
+        try stackRecursive(&result, tensor, indices, 0, dim);
+    }
+
+    return result;
+}
+fn stackRecursive(result: *Tensor, source: Tensor, indices: []usize, depth: usize, dim: usize) !void {
+    if (depth == dim) {
+        try stackRecursive(result, source, indices, depth + 1, dim);
+        return;
+    }
+
+    const num: usize = if (depth > dim) 1 else 0;
+    if (depth == source.shape.len + num) {
+        var source_indices: []usize = undefined;
+        if (dim == 0) {
+            source_indices = indices[1..];
+        } else {
+            source_indices = try std.mem.concat(source.mem.allocator(), usize, &.{indices[0..dim], indices[dim+1..]});
+        }
+
+        const value = source.get(source_indices);
+        result.set(indices, value);
+    } else {
+        const current_dim = if (depth < dim) depth else depth - 1;
+        for (0..source.shape[current_dim]) |i| {
+            indices[depth] = i;
+            try stackRecursive(result, source, indices, depth + 1, dim);
+        }
+    }
+}
+
+// ---------------------- function ----------------------
+
+// broadcast shapes
+fn broadcastShapes(a_shape: []usize, b_shape: []usize, allocator: Allocator) ![]usize {
+    const max_ndim = @max(a_shape.len, b_shape.len);
+    const new_shape = try allocator.alloc(usize, max_ndim);
+    var i: isize = @intCast(max_ndim - 1);
+    var a_idx: isize = @intCast(a_shape.len - 1);
+    var b_idx: isize = @intCast(b_shape.len - 1);
+    while (i >= 0) {
+        const a_dim = if (a_idx >= 0) a_shape[@intCast(a_idx)] else 1;
+        const b_dim = if (b_idx >= 0) b_shape[@intCast(b_idx)] else 1;
+        if (a_dim != b_dim and a_dim != 1 and b_dim != 1) {
+            return error.BroadcastError;
+        }
+        new_shape[@intCast(i)] = @max(a_dim, b_dim);
+        i -= 1;
+        a_idx -= 1;
+        b_idx -= 1;
+    }
+    return new_shape;
+}
+// calculate strides（line first）
+fn calculateStrides(allocator: Allocator, shape: []const usize) ![]usize {
+    const stride = try allocator.alloc(usize, shape.len);
+    var stride_val: usize = 1;
+    for (0..shape.len) |i| {
+        const dim = shape[shape.len - 1 - i];
+        stride[shape.len - 1 - i] = stride_val;
+        stride_val *= dim;
+    }
+    return stride;
+}
+fn createRandomFloat(random: std.Random) f32 {
+    var rand_float = random.float(f32);
+    while (rand_float == 0) {
+        rand_float = random.float(f32);
+    }
+    return rand_float;
+}
+pub fn inferShape(allocator: Allocator, array: anytype) ![]usize {
+    var shape: std.ArrayList(usize) = .empty;
+    defer shape.deinit(allocator);
+    if (@TypeOf(array) != f32) {
+        const len = array.len;
+        try shape.append(allocator, len);
+        if (@TypeOf(array[0]) != f32) {
+            const slice = try inferShape(allocator, array[0]);
+            if (slice.len > 0) {
+                try shape.appendSlice(allocator, slice);
+            }
+        }
+    }
+    return shape.toOwnedSlice(allocator);
+}
+/// calculate linear index
+inline fn linearIndex(self: *const Tensor, indices: []const usize) usize {
+    var idx: usize = 0;
+    for (indices, self.stride) |i, s| idx += i * s;
+    return idx;
+}
+fn recursiveFill(self: *Tensor, array: anytype, indices: []usize, depth: usize) void {
+    // if (depth == self.shape.len) {
+    if (@TypeOf(array) == f32) {
+        self.set(indices, @floatCast(array));
+    } else {
+        for (array, 0..) |child, i| {
+            indices[depth] = i;
+            self.recursiveFill(child, indices, depth + 1);
+        }
+    }
+}
+'''
+);

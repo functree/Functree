@@ -1,0 +1,150 @@
+const Mem = import("../../Mem.func");
+const Json = import("../Json.func");
+const JsonValue = Json.JsonValue;
+const JsonArray = Json.JsonArray;
+
+code(
+'''
+const std = @import("std");
+'''
+);
+
+const ObjectMap = std.json.ObjectMap;
+
+mem: *Mem,
+object: ObjectMap, // Map's value is JsonValue
+
+/// free memory by caller.
+pub fn a(mem: *Mem) JsonObject {
+    return JsonObject{
+        .mem = mem,
+        .object = .empty,
+    };
+}
+pub fn a2(mem: *Mem, object: ObjectMap) JsonObject {
+    return JsonObject{
+        .mem = mem,
+        .object = object,
+    };
+}
+pub fn parse(mem: *Mem, json_str: str) !JsonObject {
+    const parsed = try std.json.parseFromSlice(JsonValue, mem.allocator(), json_str, .{});
+    return JsonObject{
+        .mem = mem,
+        .object = parsed.value.object
+    };
+}
+pub fn d(self: *JsonObject) void {
+    self.object.deinit(self.mem.allocator());
+}
+
+/// Return the number of items in the map.
+pub fn count(self: JsonObject) usize {
+    return self.object.count();
+}
+/// Check if the map contains a key
+pub fn hasKey(self: JsonObject, key: str) bool {
+    return self.object.contains(key);
+}
+
+pub fn get(self: JsonObject, key: str) ?JsonValue {
+    return self.object.get(key);
+}
+pub fn getPtr(self: JsonObject, key: str) ?*JsonValue {
+    return self.object.getPtr(key);
+}
+pub fn getStr(self: JsonObject, key: str) ?str {
+    const value = self.object.get(key);
+    var ret: ?str = null;
+    if (value != null) ret = value.?.string;
+    return ret;
+}
+pub fn getInteger(self: JsonObject, key: str) ?i64 {
+    const value = self.object.get(key);
+    var ret: ?i64 = null;
+    if (value != null) ret = value.?.integer;
+    return ret;
+}
+pub fn getFloat(self: JsonObject, key: str) ?f64 {
+    const value = self.object.get(key);
+    var ret: ?f64 = null;
+    if (value != null) ret = value.?.float;
+    return ret;
+}
+pub fn getBool(self: JsonObject, key: str) ?bool {
+    const value = self.object.get(key);
+    var ret: ?bool = null;
+    if (value != null) ret = value.?.bool;
+    return ret;
+}
+pub fn getNumberString(self: JsonObject, key: str) ?str {
+    const value = self.object.get(key);
+    var ret: ?str = null;
+    if (value != null) ret = value.?.number_string;
+    return ret;
+}
+pub fn getJsonArray(self: JsonObject, key: str) ?JsonArray {
+    const value = self.object.get(key);
+    var ret: ?JsonArray = null;
+    if (value != null) {
+        ret = JsonArray.a2(self.mem, value.?.array);
+    }
+    return ret;
+}
+pub fn getJsonObject(self: JsonObject, key: str) ?JsonObject {
+    const value = self.object.get(key);
+    var ret: ?JsonObject = null;
+    if (value != null) {
+        ret = JsonObject.a2(self.mem, value.?.object);
+    }
+    return ret;
+}
+
+pub fn add(self: *JsonObject, key: str, value: anytype) !void {
+    const json_value = try Json.getJsonValue(self.mem, value);
+    return try self.object.put(self.mem.allocator(), key, json_value.*);
+}
+pub fn addStr(self: *JsonObject, key: str, valueStr: str) !void {
+    const json_value: JsonValue = .{ .string = valueStr };
+    return try self.object.put(self.mem.allocator(), key, json_value);
+}
+pub fn addInteger(self: *JsonObject, key: str, valueIntger: i32) !void {
+    const json_value: JsonValue = .{ .integer = valueIntger };
+    return try self.object.put(self.mem.allocator(), key, json_value);
+}
+pub fn addFloat(self: *JsonObject, key: str, valueFloat: f32) !void {
+    const json_value: JsonValue = .{ .float = valueFloat };
+    return try self.object.put(self.mem.allocator(), key, json_value);
+}
+pub fn addBool(self: *JsonObject, key: str, valueBool: bool) !void {
+    const json_value: JsonValue = .{ .bool = valueBool };
+    return try self.object.put(self.mem.allocator(), key, json_value);
+}
+pub fn addNumberString(self: *JsonObject, key: str, valueNumberString: str) !void {
+    const json_value: JsonValue = .{ .number_string = valueNumberString };
+    return try self.object.put(self.mem.allocator(), key, json_value);
+}
+pub fn addJsonArray(self: *JsonObject, key: str, valueArray: JsonArray) !void {
+    const json_value: JsonValue = .{ .array = valueArray.array };
+    return try self.object.put(self.mem.allocator(), key, json_value);
+}
+pub fn addJsonObject(self: *JsonObject, key: str, valueObject: JsonObject) !void {
+    const json_value: JsonValue = .{ .object = valueObject.object };
+    return try self.object.put(self.mem.allocator(), key, json_value);
+}
+
+pub fn remove(self: *JsonObject, key: str) bool {
+    return self.object.swapRemove(key);
+}
+pub fn keys(self: JsonObject) ![]str {
+    return self.object.keys();
+}
+pub fn values(self: JsonObject) ![]JsonValue {
+    return self.object.values();
+}
+pub fn toStr(self: JsonObject) ![]u8 {
+    const json_value: JsonValue = .{.object = self.object};
+    const total_size: usize = 1024000;
+    const buffer = try self.mem.alloc2(u8, total_size);
+    return try Json.toStr(buffer, json_value);
+}

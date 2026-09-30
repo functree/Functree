@@ -1,0 +1,188 @@
+
+pub const Allocator = std.mem.Allocator;
+pub const Alignment = std.mem.Alignment;
+pub const Stack = std.heap.FixedBufferAllocator;
+pub const HeapArena = std.heap.ArenaAllocator;
+
+code(
+'''
+const std = @import("std");
+//pub const Heap = std.heap.GeneralPurposeAllocator(.{});
+pub const Heap = std.heap.DebugAllocator(.{});
+'''
+);
+
+const FallbackAllocator = import("mem/FallbackAllocator.func");
+const Io = import("Io.func");
+
+heap: ?Heap = null,
+heap_arena: ?HeapArena = null,
+stack: ?Stack = null,
+stack_heap: ?FallbackAllocator = null,
+single_thread: bool = false,
+is_stack: bool = false,
+auto_free: bool = false,
+
+threaded: ?std.Io.Threaded = null,
+
+/// init a heap, must manually free the memory by 'd()' method
+pub fn a() Mem {
+    return Mem{
+        .heap = .init,
+    };
+}
+
+/// init a HeapArena，will auto free the memory by 'd()' method 
+/// must call 'a()' first, then 'f()', finally 'd()'
+pub fn f(self: *Mem) void {
+    self.heap_arena = HeapArena.init(self.heap.?.allocator());
+    self.auto_free = true;
+}
+
+/// init a StackFallbackHeap, thread safe
+/// must call 'a()' first, then 's', finally 'd()'
+pub fn s(self: *Mem, buffer: []u8) void {
+    if (self.heap_arena == null) self.f();
+    self.aStackHeap(buffer, false);
+}
+/// init a StackFallbackHeap, single thread
+/// must call 'a()' first, then 'ss', finally 'd()'
+pub fn ss(self: *Mem, buffer: []u8) void {
+    if (self.heap_arena == null) self.f();
+    self.aStackHeap(buffer, true);
+}
+fn aStackHeap(self: *Mem, buffer: []u8, single_thread: bool) void {
+    const fallback = FallbackAllocator{
+        .buffer = buffer,
+        .fallback_allocator = self.heap_arena.?,
+        .fixed_buffer_allocator = undefined,
+        .single_thread = single_thread,
+    };
+    self.stack_heap = fallback;
+    self.single_thread = single_thread;
+}
+
+///must call 'd()' once to deinit heap
+pub fn d(self: *Mem) void {
+    if (self.stack_heap != null) {
+        _ = self.stack_heap.?.fallback_allocator.deinit();
+    }
+    if (self.heap_arena != null) {
+        self.heap_arena.?.deinit();
+    }
+    if (self.heap != null) {
+        _ = self.heap.?.deinit();
+    }
+    if (self.stack != null) {
+        self.stack.?.reset();
+    }
+    if (self.threaded != null) {
+        self.threaded.?.deinit();
+    }
+}
+
+/// init a stack, thread safe, not need 'd()' and 'free'
+pub fn as(buffer: []u8) Mem {
+    return aStack(buffer, false);
+}
+/// init a stack, single thread, not need 'd()' and 'free'
+pub fn ass(buffer: []u8) Mem {
+    return aStack(buffer, true);
+}
+fn aStack(buffer: []u8, single_thread: bool) Mem {
+    return Mem{
+        .stack = Stack.init(buffer),
+        .single_thread = single_thread,
+        .is_stack = true,
+    };
+}
+///it may be required to call 'rs()' to reset stack(FixedBufferAllocator), only after 'as' or 'ass'
+pub fn rs(self: *Mem) void {
+    self.stack.?.reset();
+}
+
+pub fn isSingleThread(self: Mem) bool {
+    return self.single_thread;
+}
+pub fn isStack(self: Mem) bool {
+    return self.is_stack;
+}
+
+///get allocator
+pub fn allocator(self: *Mem) Allocator {
+    if (self.stack != null) {
+        if (self.single_thread) {
+            return self.stack.?.allocator();
+        } else {
+            return self.stack.?.threadSafeAllocator();
+        }
+    } else if (self.stack_heap != null) {
+        return self.stack_heap.?.get();
+    } else if (self.heap_arena != null) {
+        return self.heap_arena.?.allocator();
+    } else {
+        return self.heap.?.allocator();
+    }
+}
+
+
+/// returns a pointer to undefined memory
+/// it may be required to call `free` with the result to free the memory
+///
+/// for allocating an array items, see `alloc2`
+pub fn alloc(self: *Mem, comptime T: type) !*T {
+    return try self.allocator().create(T);
+}
+///manual free a pointer `ptr` should be the return value of `alloc`
+pub fn free(self: *Mem, ptr: anytype) void {
+    self.allocator().destroy(ptr);
+}
+
+/// allocates an array of `n` items of type `T` and sets all the items to `undefined`
+/// it may be required to call `free2` once the memory is no longer needed
+///
+/// for allocating a single item, see `alloc`
+pub fn alloc2(self: *Mem, comptime T: type, n: usize) ![]T {
+    return try self.allocator().alloc(T, n);
+}
+///manual free an array allocated with `alloc2`
+pub fn free2(self: *Mem, array: anytype) void {
+    self.allocator().free(array);
+}
+
+pub fn io(self: *Mem) Io.StdIo {
+    if (self.threaded == null) {
+        self.threaded = .init(self.allocator(), .{});
+    }
+    return self.threaded.?.io();
+}
+
+
+pub fn copy(dest: anytype, source: anytype) void {
+    code('''@memcpy(dest, source);''');
+}
+pub fn copyRange(dest: anytype, source: anytype, from: u32, to: u32) void {
+    code(
+    '''
+    if (to >= source.len) {
+        @memcpy(dest, source[from..]);
+    } else {
+        @memcpy(dest, source[from..to]);
+    }
+    '''
+    );
+}
+pub fn fill(array: anytype, value: anytype) void {
+    var index: u32 = 0;
+    while (index < array.len) {
+        array[index] = value;
+        index += 1;
+    }
+}
+
+pub fn sortAsc(comptime T: type, items: []T) void {
+    std.mem.sort(T, items, {}, std.sort.asc(T));
+}
+pub fn sortDesc(comptime T: type, items: []T) void {
+    std.mem.sort(T, items, {}, std.sort.desc(T));
+}

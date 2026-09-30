@@ -1,0 +1,46 @@
+const Mem = import("../../Mem.func");
+
+code(
+'''
+const std = @import("std");
+const builtin = @import("builtin");
+
+mem: *Mem,
+group: std.Io.Group,
+io: std.Io,
+
+/// init a Group
+pub fn a(mem: *Mem) Group {
+   const io = mem.io();
+   const group: std.Io.Group = .init;
+   return .{.mem=mem, .group=group, .io=io};
+}
+pub fn a2(mem: *Mem, io: std.Io) Group {
+    const group: std.Io.Group = .init;
+    return .{.mem=mem, .group=group, .io=io};
+}
+/// deinit a Group
+pub fn d(self: *Group) void {
+    self.group.cancel(self.io);
+    self.* = undefined;
+}
+
+pub fn async(self: *Group, function: anytype, args: std.meta.ArgsTuple(@TypeOf(function))) void {
+    self.group.async(self.io, function, args);
+}
+
+pub fn concurrent(self: *Group, function: anytype, args: std.meta.ArgsTuple(@TypeOf(function))) !void {
+    try self.group.concurrent(self.io, function, args);
+}
+
+/// Blocks until all tasks of the group finish.
+pub fn wait(self: *Group) !void {
+    try self.group.await(self.io);
+}
+
+/// immediately requests cancelation on all members of the group.
+pub fn cancel(self: *Group) void {
+    self.group.cancel(self.io);
+}
+'''
+);

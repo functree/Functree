@@ -1,0 +1,190 @@
+const System = import("../System.func");
+const Thread = System.Process.Thread;
+const Console = System.Io.Console;
+const String = System.DataType.String;
+
+const FunctreeTest = import("../Test.func");
+const expect = FunctreeTest.expect;
+const expectEqual = FunctreeTest.expectEqual;
+const expectEqualStrings = FunctreeTest.expectEqualStrings;
+
+
+const Io = System.Io;
+test "Io.Reader: fixed" {
+    var r: Io.Reader = .fixed("a\x02");
+    try expect((try r.takeByte()) == 'a');
+}
+
+test "Io.Reader: peek" {
+    var r: Io.Reader = .fixed("abc");
+    try expectEqualStrings("ab", try r.peek(2));
+    try expectEqualStrings("a", try r.peek(1));
+}
+
+test "Io.Reader and Io.Writer: stream" {
+    var out_buffer: [10]u8 = undefined;
+    var r: Io.Reader = .fixed("foobar");
+    var w: Io.Writer = .fixed(&out_buffer);
+    // Short streams are possible with this function but not with fixed.
+    try expectEqual(2, try r.stream(&w, .limited(2)));
+    try expectEqualStrings("fo", w.buffered());
+    try expectEqual(4, try r.stream(&w, .unlimited));
+    try expectEqualStrings("foobar", w.buffered());
+}
+
+test "Io.Writer: fixed" {
+    {
+        var buf: [255]u8 = undefined;
+        var w: Io.Writer = .fixed(&buf);
+        try w.print("{s}{s}!", .{ "Hello", "World" });
+        try expectEqualStrings("HelloWorld!", w.buffered());
+    }
+
+    comptime {
+        var buf: [255]u8 = undefined;
+        var w: Io.Writer = .fixed(&buf);
+        try w.print("{s}{s}!", .{ "Hello", "World" });
+        try expectEqualStrings("HelloWorld!", w.buffered());
+    }
+}
+
+
+const Mem = System.Mem;
+test "Mem: copy" {
+    var source:[]u16 = [1,2,3,4,5];
+    var dest:[5]u16 = undefined;
+    Mem.copy(&dest, &source);
+    try expect(dest[1]==2);
+    try expect(dest[2]==3);
+}
+test "Mem: copyRange" {
+    var source:[]u8 = [1,2,3,4,5];
+    var dest:[3]u8 = undefined;
+    Mem.copyRange(&dest, &source, 2, 5);
+    try expect(dest[0]==3);
+    try expect(dest[1]==4);
+    try expect(dest[2]==5);
+}
+
+test "Mem: fill" {
+    var buffer:[3]u8 = undefined;
+    Mem.fill(&buffer, 8);
+    try expect(buffer[0]==8);
+    try expect(buffer[1]==8);
+    try expect(buffer[2]==8);
+}
+
+test "Mem: sortAsc" {
+    var buffer:[]u8 = [1,3,2,5,4];
+    Mem.sortAsc(u8, &buffer);
+    try expect(buffer[0]==1);
+    try expect(buffer[2]==3);
+    try expect(buffer[4]==5);
+}
+test "Mem: sortDesc" {
+    var buffer:[]u32 = [1,3,2,5,4];
+    Mem.sortDesc(u32, &buffer);
+    try expect(buffer[0]==5);
+    try expect(buffer[2]==3);
+    try expect(buffer[4]==1);
+}
+
+
+const Timer = System.Timer;
+var timer: Timer = undefined;
+var count: usize = 0;
+fn onTimerTick() void {
+    count += 1;
+    Console.print2("Timer tick {}!\n", .{count});
+}
+test "Timer: a" {
+    timer = Timer.a(onTimerTick);
+    Console.println("Start timer...");
+    timer.start();
+    defer timer.stop();
+
+    Console.println("Wait for 5 seconds...");
+    Thread.sleep(5 * 1_000_000_000);
+
+    Console.println("Stop timer...");
+}
+
+
+const DataType = System.DataType;
+test "DataType: typeOf" {
+    try expect(DataType.typeOf(DataType.sizeOf(u32))==comptime_int);
+}
+test "DataType: typeName" {
+    const Pi = func{
+        pi: f64,
+    };
+
+    Console.print2("typeName=\"{s}\"\n", .{ DataType.typeName(Pi) });
+}
+test "DataType: sizeOf" {
+    const Pi = func{
+        pi: f64,
+    };
+
+    try expect(DataType.sizeOf(Pi)==8);
+    try expect(DataType.sizeOf(u32)==4);
+}
+
+
+const Math = System.Math;
+test "Math: abs2" {
+    try expect(Math.abs2(i8, -1)==1);
+}
+test "Math: ceil" {
+    try expect(Math.ceil(1.5)==2);
+}
+test "Math: floor" {
+    try expect(Math.floor(1.5)==1);
+}
+test "Math: round" {
+    try expect(Math.round(1.5)==2);
+}
+test "Math: trunc" {
+    try expect(Math.trunc(-1.5)==-1);
+}
+
+test "Math: min" {
+    try expect(Math.min(-2, -1)==-2);
+}
+test "Math: max" {
+    try expect(Math.max(-2, -1)==-1);
+}
+
+test "Math: divExact" {
+    try expect(try Math.divExact(i8, 6, 3)==2);
+}
+test "Math: divFloor" {
+    try expect(try Math.divFloor(i8, -5, 3)==-2);
+}
+test "Math: divTrunc" {
+    try expect(try Math.divTrunc(i8, -5, 3)==-1);
+}
+
+test "Math: mod2" {
+    try expect(try Math.mod2(i8, -5, 3)==1);
+}
+test "Math: rem" {
+    try expect(try Math.rem(i8, -5, 3)==-2);
+}
+test "Math: pow" {
+    try expect(Math.pow(i8, 2, 3)==8);
+}
+
+
+const Process = System.Process;
+test "Process: a" {
+    // init heap memory
+    var mem = Mem.a();
+    mem.f();
+    defer mem.d();
+
+    const argv: []str = ["zig", "version"];
+    var process = try Process.a(&mem, &argv);
+    defer process.d();
+    Console.print2("zig_version={s}", .{process.result.stdout});
+}

@@ -1,0 +1,84 @@
+const Mem = import("../Mem.func");
+const String = import("String.func");
+const List = import("List.func");
+
+pub const control_code = std.ascii.control_code;
+
+code(
+'''
+const std = @import("std");
+const unicode = std.unicode;
+const Utf8Iterator = unicode.Utf8Iterator;
+const ascii = std.ascii;
+'''
+);
+
+
+/// Returns whether the character is a control character.
+pub fn isControl(value: u8) bool {
+    return ascii.isControl(value);
+}
+/// Returns whether the character is a digit.
+pub fn isDigit(value: u8) bool {
+    return ascii.isDigit(value);
+}
+/// Returns whether the character is a lowercase letter.
+pub fn isLower(value: u8) bool {
+    return ascii.isLower(value);
+}
+/// Returns whether the character is an uppercase letter.
+pub fn isUpper(value: u8) bool {
+    return ascii.isUpper(value);
+}
+/// Returns whether the character is a hexadecimal digit: A-F, a-f, or 0-9.
+pub fn isHex(value: u8) bool {
+    return ascii.isHex(value);
+}
+/// Returns whether the character is a 7-bit ASCII character.
+pub fn isAscii(value: u8) bool {
+    return ascii.isAscii(value);
+}
+
+/// Lowercases the character and returns it as-is if already lowercase or not a letter.
+pub fn lower(value: u8) u8 {
+    return ascii.toLower(value);
+}
+/// Uppercases the character and returns it as-is if already uppercase or not a letter.
+pub fn upper(value: u8) u8 {
+    return ascii.toUpper(value);
+}
+
+/// Returns true if the given unicode codepoint can be encoded in UTF-8.
+pub fn isUtf8Codepoint(value: u21) bool {
+    return unicode.utf8ValidCodepoint(value);
+}
+/// Encodes the given codepoint into a UTF-8 byte sequence.
+pub fn utf8Encode(value: u21) ![]u8 {
+    var output: [4]u8 = undefined;
+    const byte_count = try unicode.utf8Encode(value, output[0..]);
+    return output[0..byte_count];
+}
+/// Decodes the UTF-8 codepoint encoded in the given slice of bytes.
+pub fn utf8Decode(value: str) !u21 {
+    return try unicode.utf8Decode(value);
+}
+/// Given the first byte of a UTF-8 codepoint,
+/// returns a number 1-4 indicating the total length of the codepoint in bytes.
+/// If this byte does not match the form of a UTF-8 start byte, returns Utf8InvalidStartByte.
+pub fn getUtf8CharLength(first_byte: u8) !u3 {
+    return try unicode.utf8ByteSequenceLength(first_byte);
+}
+
+/// get Utf8Iterator of the given str.
+pub fn getUtf8Iter(value: str) !Utf8Iterator {
+    return (try unicode.Utf8View.init(value)).iterator();
+}
+/// get Utf8CharArray of the given str.
+pub fn getUtf8CharList(mem: *Mem, value: str) !List.t(str) {
+    var list = List.t(str).a(mem);
+    var iter = (try unicode.Utf8View.init(value)).iterator();
+    while (iter.nextCodepointSlice()) |string| {
+        try list.add(try String.copyStr(mem, string));
+    }
+    return list;
+}

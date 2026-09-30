@@ -1,0 +1,19 @@
+pub const File = import("fs/File.func");
+pub const Dir = import("fs/Dir.func");
+
+const Mem = import("../Mem.func");
+const String = import("../datatype/String.func");
+
+code(
+'''
+const std = @import("std");
+'''
+);
+
+pub fn isAbsolutePath(path: str) bool {
+    return std.fs.path.isAbsolute(path);
+}
+
+pub fn joinPath(mem: *Mem, paths: []str) ![]u8 {
+    return try std.fs.path.join(mem.allocator(), paths);
+}

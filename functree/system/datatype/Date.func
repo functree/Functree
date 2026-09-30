@@ -1,0 +1,496 @@
+const Mem = import("../Mem.func");
+const DataType = import("../DataType.func");
+const Math = import("../Math.func");
+const DateTime = import("DateTime.func");
+const TimeZone = DateTime.TimeZone;
+const TimeUnit = DateTime.TimeUnit;
+const digit2str = DateTime.digit2str;
+
+code(
+'''
+const std = @import("std");
+'''
+);
+
+pub const Error = DateTime.Error;
+
+year: i32,
+month: u8,
+day: u8,
+hour: u8 = 0,
+timezone: TimeZone = .utc0, // default UTC-0
+
+pub fn a(year: i32, month: u8, day: u8) !Date {
+    if (!Date.valid(year, month, day)) {
+        return Error.invalidDate;
+    }
+
+    return .{
+        .year = year,
+        .month = month,
+        .day = day,
+    };
+}
+pub fn a2(year: i32, month: u8, day: u8, _timezone: TimeZone) !Date {
+    if (!Date.valid(year, month, day)) {
+        return Error.invalidDate;
+    }
+
+    return .{
+        .year = year,
+        .month = month,
+        .day = day,
+        .timezone = _timezone,
+    };
+}
+
+pub fn addYear(self: *Date, count: i32) void {
+    self.year = self.year + count;
+}
+pub fn addMonth(self: *Date, count: i32) void {
+    var month_count = count;
+    if (month_count >= 0) {
+        while (self.month + month_count >= 12) {
+            self.year = self.year + 1;
+            month_count = month_count - (12 - self.month + 1);
+            self.month = 1;
+        }
+        self.month = self.month + DataType.intCast(u8, month_count);
+    } else {
+        while (self.month + month_count < 1) {
+            self.year = self.year - 1;
+            month_count = month_count + self.month;
+            self.month = 12;
+        }
+        self.month = self.month - DataType.intCast(u8, month_count * -1);
+    }
+}
+pub fn addDay(self: *Date, count: i32) void {
+    var day_count = count;
+    if (day_count >= 0) {
+        var max_days = daysInMonth(self.year, self.month);
+        while (self.day + day_count > max_days) {
+            day_count = day_count - (max_days - self.day + 1);
+            self.day = 1;
+            self.addMonth(1);
+            max_days = daysInMonth(self.year, self.month);
+        }
+        self.day = self.day + DataType.intCast(u8, day_count);
+    } else {
+        var max_days: u8 = undefined;
+        while (self.day + day_count < 1) {
+            day_count = day_count + self.day;
+            self.addMonth(-1);
+            max_days = daysInMonth(self.year, self.month);
+            self.day = max_days;
+        }
+        self.day = self.day - DataType.intCast(u8, day_count * -1);
+    }
+}
+fn addHour(self: *Date, count: i32) void {
+    var hour_count = count;
+    if (hour_count >= 0) {
+        while (self.hour + hour_count >= 24) {
+            hour_count = hour_count - (24 - self.hour);
+            self.hour = 0;
+            self.addDay(1);
+        }
+        self.hour = self.hour + DataType.intCast(u8, hour_count);
+    } else {
+        while (self.hour + hour_count < 0) {
+            hour_count = hour_count + self.hour;
+            self.addDay(-1);
+            self.hour = 24;
+        }
+        self.hour = self.hour - DataType.intCast(u8, hour_count * -1);
+    }
+}
+
+pub fn compare(self: Date, value: Date) i8 {
+    if (self.year > value.year) {
+        return 1;
+    } else if (self.year < value.year) {
+        return -1;
+    }
+    if (self.month > value.month) {
+        return 1;
+    } else if (self.month < value.month) {
+        return -1;
+    }
+    if (self.day > value.day) {
+        return 1;
+    } else if (self.day < value.day) {
+        return -1;
+    }
+    const self_timezone = DataType.intFromEnum(i8, self.timezone);
+    const value_timezone = DataType.intFromEnum(i8, value.timezone);
+    if (self_timezone > value_timezone) {
+        return 1;
+    } else if (self_timezone < value_timezone) {
+        return -1;
+    }
+
+    return 0;
+}
+
+/// calculate day interval between 2 Date.
+pub fn dayInterval(self: Date, value: Date) u32 {
+    var days: u32 = 0;
+
+    const result = self.compare(value);
+    if (result != 0) {
+        //in seconds
+        const self_timestamp = self.toTimestamp();
+        const value_timestamp = value.toTimestamp();
+        code (
+        '''
+        const interval_seconds: u32 = @as(u32, @intCast(@abs(self_timestamp - value_timestamp)));
+        days = @divFloor(interval_seconds, DateTime.s_per_day);
+        '''
+        );
+    }
+
+    return days;
+}
+
+pub fn equal(self: Date, value: Date) bool {
+    if (self.year != value.year) {
+        return false;
+    }
+    if (self.month != value.month) {
+        return false;
+    }
+    if (self.day != value.day) {
+        return false;
+    }
+    if (self.timezone != value.timezone) {
+        return false;
+    }
+
+    return true;
+}
+
+///defaut format: y-m-d
+pub fn parse(value: str) !Date {
+    return try parse2(value, "y-m-d");
+}
+///format: y-m-d, y-mm-dd
+pub fn parse2(value: str, format: str) !Date {
+    var str_index: usize = 0;
+    var format_index: usize = 0;
+
+    var year: i32 = undefined;
+    var month: u8 = undefined;
+    var day: u8 = undefined;
+
+    while (format_index < format.len) {
+        const c = format[format_index];
+
+        if (c == 'y') {
+            if (format_index+1 < format.len and format[format_index+1] == 'y') {
+                return Error.invalidYearFormat;
+            }
+            const start = str_index;
+            var is_negative: bool = false;
+            if (start > 0 and value[start-1] == '-') {
+                is_negative = true;
+            }
+            while (str_index < value.len) {
+                if (value[str_index] < '0' or value[str_index] > '9') {
+                    break;
+                }
+                str_index += 1;
+            }
+            year = try std.fmt.parseInt(i32, value[start..str_index], 10);
+            if (is_negative) {
+                year = -year;
+            }
+            format_index += 1;
+        } else if (c == 'm') {
+            if (format_index+2 < format.len and format[format_index+2] == 'm') {
+                return Error.invalidMonthFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'm') { //01,12
+                format_index += 2;
+            } else { //1,12
+                format_index += 1;
+            }
+            var start = str_index;
+            while (str_index < value.len) {
+                if (value[str_index] < '0' or value[str_index] > '9') {
+                    break;
+                }
+                if (str_index == start and value[str_index] == '0') {
+                    str_index += 1;
+                    start = str_index;
+                    continue;
+                }
+                str_index += 1;
+            }
+            month = try std.fmt.parseInt(u8, value[start..str_index], 10);
+        } else if (c == 'd') {
+            if (format_index+2 < format.len and format[format_index+2] == 'd') {
+                return Error.invalidDayFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'd') { //01,31
+                format_index += 2;
+            } else { //1,31
+                format_index += 1;
+            }
+            var start = str_index;
+            while (str_index < value.len) {
+                if (value[str_index] < '0' or value[str_index] > '9') {
+                    break;
+                }
+                if (str_index == start and value[str_index] == '0') {
+                    str_index += 1;
+                    start = str_index;
+                    continue;
+                }
+                str_index += 1;
+            }
+            day = try std.fmt.parseInt(u8, value[start..str_index], 10);
+        } else {
+            while (str_index < value.len) {
+                if (value[str_index] < '0' or value[str_index] > '9') {
+                    str_index += 1;
+                    break;
+                }
+                str_index += 1;
+            }
+            format_index += 1;
+        }
+    }
+
+    return Date.a(year, month, day);
+}
+
+pub fn order(self: Date, date: Date) std.math.Order {
+    const year_order = std.math.order(self.year, date.year);
+    if (year_order != .eq) return year_order;
+
+    const month_order = std.math.order(self.month, date.month);
+    if (month_order != .eq) return month_order;
+
+    return std.math.order(self.day, date.day);
+}
+
+pub fn setTimezone(self: *Date, _timezone: TimeZone) void {
+    const hours = DataType.intFromEnum(i32, _timezone);
+    self.addHour(hours);
+    self.timezone = _timezone;
+}
+
+///default format: y-mm-dd
+pub fn toStr(self: Date, buffer: []u8) []u8 {
+    var count: usize = 10;
+    var buf: []u8 = undefined;
+
+    if (self.year < 0) {
+        _ = std.fmt.bufPrint(buffer, "{:0>5}", .{ self.year }) catch unreachable;
+        buf = buffer[5..];
+        count = 11;
+    } else {
+        _ = std.fmt.bufPrint(buffer, "{:0>4}", .{ DataType.intCast(u32, self.year) }) catch unreachable;
+        buf = buffer[4..];
+    }
+    buf[0] = '-';
+    buf[1..3].* = digit2str(self.month);
+    buf[3] = '-';
+    buf[4..6].* = digit2str(self.day);
+
+    return buffer[0..count];
+}
+///format: y-m-d, y-mm-dd
+pub fn toStr2(self: Date, buffer: []u8, format: str) ![]u8 {
+    var count: usize = 0;
+    var format_index: usize = 0;
+    while (format_index < format.len) {
+        const c = format[format_index];
+
+        if (c == 'y') {
+            if (format_index+1 < format.len and format[format_index+1] == 'y') {
+                return Error.invalidYearFormat;
+            }
+            if (self.year < 0) {
+                _ = std.fmt.bufPrint(buffer[count..], "{:0>5}", .{ self.year }) catch unreachable;
+                count += 1;
+            } else {
+                _ = std.fmt.bufPrint(buffer[count..], "{:0>4}", .{ DataType.intCast(u32, self.year) }) catch unreachable;
+            }
+            format_index += 1;
+            count += 4;
+        } else if (c == 'm') {
+            if (format_index+2 < format.len and format[format_index+2] == 'm') {
+                return Error.invalidMonthFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'm') { //01,12
+                Mem.copy(buffer[count..count+2], digit2str(self.month)[0..]);
+                format_index += 2;
+                count += 2;
+            } else { //1,12
+                if (self.month >= 10) {
+                    Mem.copy(buffer[count..count+2], digit2str(self.month)[0..]);
+                    count += 2;
+                } else {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:1}", .{ self.month }) catch unreachable;
+                    count += 1;
+                }
+                format_index += 1;
+            }
+        } else if (c == 'd') {
+            if (format_index+2 < format.len and format[format_index+2] == 'd') {
+                return Error.invalidDayFormat;
+            }
+            if (format_index+1 < format.len and format[format_index+1] == 'd') { //01,31
+                Mem.copy(buffer[count..count+2], digit2str(self.day)[0..]);
+                format_index += 2;
+                count += 2;
+            } else { //1,31
+                if (self.day >= 10) {
+                    Mem.copy(buffer[count..count+2], digit2str(self.day)[0..]);
+                    count += 2;
+                } else {
+                    _ = std.fmt.bufPrint(buffer[count..], "{:1}", .{ self.day }) catch unreachable;
+                    count += 1;
+                }
+                format_index += 1;
+            }
+        } else {
+            buffer[count] = c;
+            format_index += 1;
+            count += 1;
+        }
+    }
+
+    return buffer[0..count];
+}
+
+/// convert Date(after 1970) to timestamp, in seconds.
+pub fn toTimestamp(self: Date) i64 {
+    var total_days: i64 = 0;
+    var year: i32 = 1970;
+    while (year < self.year) {
+        total_days = total_days + Date.daysInYear(year);
+        year = year + 1;
+    }
+
+    var month: u8 = 1;
+    while (month < self.month) {
+        total_days = total_days + Date.daysInMonth(self.year, month);
+        month = month + 1;
+    }
+
+    total_days = total_days + self.day - 1;
+
+    const total_seconds = total_days * DateTime.s_per_day;
+
+    return total_seconds;
+}
+/// convert Date(after 1970) to milliTimestamp, in milliseconds.
+pub fn toMilliTimestamp(self: Date) i64 {
+    return self.toTimestamp() * DateTime.ms_per_s;
+}
+
+/// Get a now Date, default in seconds.
+pub fn today() !Date {
+    return try timestampToDate(DateTime.timestamp(), .second, .utc0);
+}
+/// convert timestamp to Date.
+pub fn timestampToDate(value: i64, time_unit: TimeUnit, _timezone: ?TimeZone) !Date {
+    var year: i32 = undefined;
+    var month: u8 = undefined;
+    var day: u8 = undefined;
+    var hour: u8 = undefined;
+    var timezone: TimeZone = .utc0;
+    if (_timezone != null) {
+        timezone = _timezone.?;
+    }
+
+    var days_since_epoch: i64 = undefined;
+    var seconds_left: i64 = undefined;
+    if (time_unit == .second) {
+        days_since_epoch = try Math.divFloor(i64, value, DateTime.s_per_day);
+        seconds_left = try Math.rem(i64, value, DateTime.s_per_day);
+    } else if (time_unit == .millisecond) {
+        days_since_epoch = try Math.divFloor(i64, value, DateTime.ms_per_day);
+        const milliseconds_left = try Math.rem(i64, value, DateTime.ms_per_day);
+        seconds_left = try Math.divFloor(i64, milliseconds_left, DateTime.ms_per_s);
+    } else if (time_unit == .microsecond) {
+        days_since_epoch = try Math.divFloor(i64, value, DateTime.us_per_day);
+        const microseconds_left = try Math.rem(i64, value, DateTime.us_per_day);
+        seconds_left = try Math.divFloor(i64, microseconds_left, DateTime.us_per_s);
+    } else {
+        return Error.unsupportTimeUnit;
+    }
+
+    year = 1970;
+    while (days_since_epoch >= Date.daysInYear(year)) {
+        days_since_epoch -= Date.daysInYear(year);
+        year += 1;
+    }
+    month = 1;
+    while (days_since_epoch >= Date.daysInMonth(year, month)) {
+        days_since_epoch -= Date.daysInMonth(year, month);
+        month += 1;
+    }
+    day = DataType.intCast(u8, days_since_epoch) + 1;
+    hour = 0;
+    while (seconds_left >= DateTime.s_per_hour) {
+        seconds_left -= DateTime.s_per_hour;
+        hour += 1;
+    }
+
+    return Date{
+        .year = year,
+        .month = month,
+        .day = day,
+        .hour = hour,
+        .timezone = timezone,
+    };
+}
+
+pub fn valid(year: i32, month: u8, day: u8) bool {
+    if (month == 0 or month > 12) {
+        return false;
+    }
+
+    if (day == 0) {
+        return false;
+    }
+
+    const max_days = daysInMonth(year, month);
+    if (day > max_days) {
+        return false;
+    }
+
+    return true;
+}
+
+pub fn daysInMonth(year: i32, month: u8) u8 {
+    const month_days: []u8 = [ 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 ];
+    code(
+    '''
+    const max_days = if (month == 2 and (@rem(year, 400) == 0 or (@rem(year, 100) != 0 and @rem(year, 4) == 0))) 29 else month_days[month - 1];
+    '''
+    );
+    return max_days;
+}
+pub fn daysInYear(year: i32) i32 {
+    if (isLeapYear(year)) {
+        return 366;
+    } else {
+        return 365;
+    }
+}
+pub fn isLeapYear(year: i32) bool {
+    code(
+    '''
+    if (@rem(year, 4) != 0)
+        return false;
+    if (@rem(year, 100) != 0)
+        return true;
+    return (0 == @rem(year, 400));
+    '''
+    );
+}

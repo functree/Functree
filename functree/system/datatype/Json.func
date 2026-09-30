@@ -1,0 +1,128 @@
+const Mem = import("../Mem.func");
+const DataType = import("../DataType.func");
+const String = DataType.String;
+
+pub const JsonObject = import("json/JsonObject.func");
+pub const JsonArray = import("json/JsonArray.func");
+
+code(
+'''
+const std = @import("std");
+pub const JsonValue = std.json.Value;
+
+/// value include: null, bool: bool, integer: i64, float: f64, string: []const u8, JsonArray, JsonObject
+pub fn getJsonValue(mem: *Mem, value: anytype) !*JsonValue {
+    var json_value = try mem.alloc(JsonValue);
+    const T = DataType.typeOf(value);
+    const ty = DataType.typeInfo(T);
+    switch (ty) {
+        .null => json_value.* = .null,
+        .bool => json_value.* = .{.bool = value},
+        .int, .comptime_int, .float, .comptime_float => {
+            const buffer = try mem.alloc2(u8, 50);
+            const string = try String.formatStr2(buffer, "{d}", .{value});
+            json_value.* = JsonValue.parseFromNumberSlice(string);
+        },
+        .optional => {
+            if (value) |val| {
+                json_value = try getJsonValue(mem, val);
+            } else {
+                json_value.* = .null;
+            }
+        },
+        .pointer => {
+            const type_info = ty.pointer;
+            switch (type_info.size) {
+                .one => {
+                    const ty_child = @typeInfo(type_info.child);
+                    switch (ty_child) {
+                        .array => {
+                            // Coerce `*[N]T` to `[]const T`.
+                            const Slice = []const std.meta.Elem(type_info.child);
+                            return try getJsonValue(mem, @as(Slice, value));
+                        },
+                        else => return try getJsonValue(mem, value.*),
+                    }
+                },
+                .many, .slice => {
+                    if (type_info.size == .many and type_info.sentinel() == null)
+                        return error.UnableHandlePointerTypeWithoutSentinel;
+                    const slice = if (type_info.size == .many) std.mem.span(value) else value;
+
+                    if (type_info.child == u8) {
+                        // This is a []const u8, or some similar Zig string.
+                        if (std.unicode.utf8ValidateSlice(slice)) {
+                            json_value.* = .{.string = value};
+                            return json_value;
+                        }
+                    }
+
+                    for (slice) |x| {
+                        return try getJsonValue(mem, x);
+                    }
+                },
+                else => return error.UnableHandlePointerType,
+            }
+        },
+        .@"struct" => {
+            // only JsonObject or JsonArray
+            if (@hasField(T, "object")) {
+                json_value.* = .{.object = value.object};
+            } else if (@hasField(T, "array")) {
+                json_value.* = .{.array = value.array};
+            } else {
+                return error.NoSupportStructValueType;
+            }
+        },
+        else => {
+            return error.NoSupportValueType;
+        },
+    }
+    // switch (T) {
+    //     bool => json_value = .{.bool = value},
+    //     i8, i16, i32, i64, i128, u8, u16, u32, u64, u128, f16, f32, f64, f80, f128, isize, usize, comptime_int, comptime_float => {
+    //         var buffer: [30]u8 = undefined;
+    //         const string = try String.formatStr2(&buffer, "{d}", .{value});
+    //         json_value = JsonValue.parseFromNumberSlice(string);
+    //     },
+    //     ?i8, ?i16, ?i32, ?i64, ?i128, ?u8, ?u16, ?u32, ?u64, ?u128, ?f16, ?f32, ?f64, ?f80, ?f128 => {
+    //         if (value) |v| {
+    //             var buffer: [30]u8 = undefined;
+    //             const string = try String.formatStr2(&buffer, "{d}", .{v});
+    //             json_value = JsonValue.parseFromNumberSlice(string);
+    //         } else {
+    //             json_value = .null;
+    //         }
+    //     },
+    //     @TypeOf(null) =>{
+    //         json_value = .null;
+    //     },
+    //     else => {
+    //         const type_name = DataType.typeName(T);
+    //         std.debug.print("{s}\n", .{type_name});
+    //         if (String.equalStr(type_name, "functree_system_datatype_json_JsonObject")) {
+    //             json_value = .{.object = value.object};
+    //         } else if (String.equalStr(type_name, "functree_system_datatype_json_JsonArray")) {
+    //             json_value = .{.array = value.array};
+    //         } else if (String.equalStr(type_name, "json.dynamic.Value") or String.equalStr(type_name, "std.json.dynamic.Value")) {
+    //             json_value = value;
+    //         } else {
+    //             json_value = .{.string = value};
+    //         }
+    //     },
+    // }
+    return json_value;
+}
+'''
+);
+
+pub fn parse(mem: *Mem, json_str: str) !JsonValue {
+    const parsed = try std.json.parseFromSlice(JsonValue, mem.allocator(), json_str, .{});
+    return parsed.value;
+}
+
+pub fn toStr(buffer: []u8, value: anytype) ![]u8 {
+    var w: std.Io.Writer = .fixed(buffer);
+    try std.json.Stringify.value(value, .{}, &w);
+    return w.buffered();
+}

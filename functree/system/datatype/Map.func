@@ -1,18 +1,20 @@
-const Memory = @import("../Memory.zig");
+const Mem = import("../Mem.func");
 
+code(
+'''
 const std = @import("std");
 
-pub fn t(comptime V: type) type {
-    return struct {
+pub fn t(comptime K: type, comptime V: type) type {
+    return struct{
         const Self = @This();
-        memory: *Memory,
-        map: std.StringHashMap(V),
+        mem: *Mem,
+        map: std.AutoHashMap(K, V),
 
-        /// free memory by caller
-        pub fn a(memory: *Memory) Self {
-            const map = std.StringHashMap(V).init(memory.allocator());
+        /// free memory by caller.
+        pub fn a(mem: *Mem) Self {
+            const map = std.AutoHashMap(K, V).init(mem.allocator());
             return Self{
-                .memory = memory,
+                .mem = mem,
                 .map = map,
             };
         }
@@ -33,20 +35,23 @@ pub fn t(comptime V: type) type {
             return self.map.count();
         }
         /// Check if the map contains a key
-        pub fn hasKey(self: Self, key: []const u8) bool {
+        pub fn hasKey(self: Self, key: K) bool {
             return self.map.contains(key);
         }
-        pub fn get(self: Self, key: []const u8) ?V {
+        pub fn get(self: Self, key: K) ?V {
             return self.map.get(key);
         }
-        pub fn add(self: *Self, key: []const u8, value: V) !void {
+        pub fn getPtr(self: Self, key: K) ?*V {
+            return self.map.getPtr(key);
+        }
+        pub fn add(self: *Self, key: K, value: V) !void {
             return try self.map.put(key, value);
         }
-        pub fn remove(self: *Self, key: []const u8) bool {
+        pub fn remove(self: *Self, key: K) bool {
             return self.map.remove(key);
         }
-        pub fn keys(self: Self) ![]const []const u8 {
-            var key_array = try self.memory.alloc2([]const u8, self.count());
+        pub fn keys(self: Self) ![]const K {
+            var key_array = try self.mem.alloc2(K, self.count());
             var iter = self.map.keyIterator();
             var i: usize = 0;
             while (iter.next()) |key| {
@@ -56,7 +61,7 @@ pub fn t(comptime V: type) type {
             return key_array;
         }
         pub fn values(self: Self) ![]const V {
-            var value_array = try self.memory.alloc2(V, self.count());
+            var value_array = try self.mem.alloc2(V, self.count());
             var iter = self.map.valueIterator();
             var i: usize = 0;
             while (iter.next()) |value| {
@@ -67,5 +72,5 @@ pub fn t(comptime V: type) type {
         }
     };
 }
-
-const StringMap = @This();
+'''
+);

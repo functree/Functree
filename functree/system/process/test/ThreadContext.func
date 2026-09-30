@@ -1,0 +1,46 @@
+const System = import("../../../System.func");
+const Mem = System.Mem;
+const Io = System.Io;
+const Thread = System.Process.Thread;
+
+const FunctreeTest = import("../../../Test.func");
+const expectEqual = FunctreeTest.expectEqual;
+const expectEqualStrings = FunctreeTest.expectEqualStrings;
+
+start_wait_event: Io.Event = .unset,
+test_done_event: Io.Event = .unset,
+thread_done_event: Io.Event = .unset,
+
+thread: Thread = undefined,
+
+pub fn run(ctx: *ThreadContext) !void {
+    // Wait for the main thread to have set the thread field in the context.
+    const io = ctx.thread.io;
+    try ctx.start_wait_event.wait(io);
+
+    try testThreadName(&ctx.thread);
+
+    // Signal our test is done
+    ctx.test_done_event.set(io);
+
+    // wait for the thread to property exit
+    try ctx.thread_done_event.wait(io);
+}
+
+pub fn testThreadName(thread: *Thread) !void {
+    const testCases: []str = [
+        "mythread",
+        "b" ** Thread.max_name_len,
+    ];
+
+    for (testCases) |tc| {
+        try thread.setName(tc);
+        const name = try thread.getName();
+        if (name != null) {
+            const value = name.?;
+
+            try expectEqual(tc.len, value.len);
+            try expectEqualStrings(tc, value);
+        }
+    }
+}

@@ -120,37 +120,6 @@ pub fn subString(self: String, start: usize, end: usize) !String {
     };
 }
 
-pub fn toLower(self: String) !String {
-    const buffer = try self.memory.alloc2(u8, self.bytes.len);
-    var i: usize = 0;
-    while (i < self.bytes.len) {
-        const size = std.unicode.utf8ByteSequenceLength(self.bytes[i]) catch 1;
-        if (size == 1) {
-            buffer[i] = std.ascii.toLower(self.bytes[i]);
-        }
-        i += size;
-    }
-    return String{
-        .memory = self.memory,
-        .bytes = buffer,
-    };
-}
-
-pub fn toUpper(self: String) !String {
-    const buffer = try self.memory.alloc2(u8, self.bytes.len);
-    var i: usize = 0;
-    while (i < self.bytes.len) {
-        const size = std.unicode.utf8ByteSequenceLength(self.bytes[i]) catch 1;
-        if (size == 1) {
-            buffer[i] = std.ascii.toUpper(self.bytes[i]);
-        }
-        i += size;
-    }
-    return String{
-        .memory = self.memory,
-        .bytes = buffer[0..],
-    };
-}
 pub fn trim(self: String) !String {
     const buffer = std.mem.trim(u8, self.bytes, " \r\n");
     return String{
@@ -287,53 +256,6 @@ pub fn splitStr(value: []const u8, delimiter: []const u8) ![]const []const u8 {
     return try splitArr.toOwnedSlice(std.heap.page_allocator);
 }
 
-pub fn toLowerStr(memory: *Memory, value: []const u8) ![]const u8 {
-    const buffer = try memory.alloc2(u8, value.len);
-    var i: usize = 0;
-    while (i < value.len) {
-        const size = std.unicode.utf8ByteSequenceLength(value[i]) catch 1;
-        if (size == 1) {
-            buffer[i] = std.ascii.toLower(value[i]);
-        }
-        i += size;
-    }
-    return buffer[0..i];
-}
-pub fn toLowerStr2(buffer: []u8, value: []const u8) ![]const u8 {
-    var i: usize = 0;
-    while (i < value.len) {
-        const size = std.unicode.utf8ByteSequenceLength(value[i]) catch 1;
-        if (size == 1) {
-            buffer[i] = std.ascii.toLower(value[i]);
-        }
-        i += size;
-    }
-    return buffer[0..i];
-}
-
-pub fn toUpperStr(memory: *Memory, value: []const u8) ![]const u8 {
-    const buffer = try memory.alloc2(u8, value.len);
-    var i: usize = 0;
-    while (i < value.len) {
-        const size = std.unicode.utf8ByteSequenceLength(value[i]) catch 1;
-        if (size == 1) {
-            buffer[i] = std.ascii.toUpper(value[i]);
-        }
-        i += size;
-    }
-    return buffer[0..i];
-}
-pub fn toUpperStr2(buffer: []u8, value: []const u8) ![]const u8 {
-    var i: usize = 0;
-    while (i < value.len) {
-        const size = std.unicode.utf8ByteSequenceLength(value[i]) catch 1;
-        if (size == 1) {
-            buffer[i] = std.ascii.toUpper(value[i]);
-        }
-        i += size;
-    }
-    return buffer[0..i];
-}
 pub fn startWithStr(value: []const u8, needle: []const u8) bool {
     return std.mem.startsWith(u8, value, needle);
 }

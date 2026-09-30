@@ -1,0 +1,29 @@
+const Mem = import("../Mem.func");
+
+code(
+'''
+const std = @import("std");
+'''
+);
+
+
+pub fn maxValue(comptime value_type: type) comptime_int {
+    return std.math.maxInt(value_type);
+}
+pub fn minValue(comptime value_type: type) comptime_int {
+    return std.math.minInt(value_type);
+}
+
+pub fn parse(value: str) !isize {
+    return try std.fmt.parseInt(isize, value, 10);
+}
+pub fn parse2(comptime value_type: type, value: str) !value_type {
+    return try std.fmt.parseInt(value_type, value, 10);
+}
+
+pub fn toStr(mem: *Mem, value: anytype) ![]u8 {
+    return try std.fmt.allocPrint(mem.allocator(), "{d}", .{ value });
+}
+pub fn toStr2(buffer: []u8, value: anytype) ![]u8 {
+    return try std.fmt.bufPrint(buffer, "{d}", .{ value });
+}

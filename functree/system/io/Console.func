@@ -1,0 +1,226 @@
+code(
+'''
+const std = @import("std");
+'''
+);
+
+const Mem = import("../Mem.func");
+const DataType = import("../DataType.func");
+const List = DataType.List;
+const String = DataType.String;
+
+mem: *Mem,
+
+pub fn a(mem: *Mem) Console {
+    const self = Console{
+        .mem = mem,
+    };
+    return self;
+}
+// free Console
+pub fn d(self: *Console) void {
+    self.* = undefined;
+}
+
+code('''
+pub fn input(self: *Console, delimiter: u8) ![]u8 {
+    const io = self.mem.io();
+    var in_buffer: [4096]u8 = undefined;
+    var reader = std.Io.File.stdin().reader(io, &in_buffer);
+    const stdin = &reader.interface;
+
+    var line = try stdin.takeDelimiterExclusive(delimiter);
+    if (line.len > 0 and line[line.len - 1] == '\r') {
+        line = line[0 .. line.len - 1];
+    }
+    stdin.toss(1);
+
+    if (!String.isUtf8Str(line)) {
+        line = try toUtf8Str(self.mem, line);
+    }
+    return try String.copyStr(self.mem, line);
+}
+
+const builtin = @import("builtin");
+const windows = struct {
+    const UINT = c_uint;
+    const BOOL = c_int;
+    const DWORD = c_ulong;
+    const LPCSTR = [*]const u8;
+    const LPWSTR = [*]u16;
+    const CP_UTF8: UINT = 65001;
+    const CP_GBK: UINT = 936;
+    const MB_ERR_INVALID_CHARS: DWORD = 0x00000008;
+
+    extern "kernel32" fn GetConsoleCP() callconv(.winapi) UINT;
+    extern "kernel32" fn GetACP() callconv(.winapi) UINT;
+    extern "kernel32" fn SetConsoleCP(wCodePageID: UINT) callconv(.winapi) BOOL;
+    extern "kernel32" fn SetConsoleOutputCP(wCodePageID: UINT) callconv(.winapi) BOOL;
+    extern "kernel32" fn MultiByteToWideChar(
+        CodePage: UINT,
+        dwFlags: DWORD,
+        lpMultiByteStr: LPCSTR,
+        cbMultiByte: c_int,
+        lpWideCharStr: ?LPWSTR,
+        cchWideChar: c_int,
+    ) callconv(.winapi) c_int;
+    extern "kernel32" fn WideCharToMultiByte(
+        code_page: UINT,
+        flags: DWORD,
+        input: ?[*]const u16,
+        input_len: c_int,
+        output: ?[*]u8,
+        output_len: c_int,
+        default_char: ?[*]const u8,
+        used_default_char: ?*BOOL,
+    ) callconv(.winapi) c_int;
+};
+fn toUtf8Str(mem: *Mem, bytes: []const u8) ![]u8 {
+    if (std.unicode.utf8ValidateSlice(bytes)) return try String.copyStr(mem, bytes);
+
+    if (comptime builtin.os.tag == .windows) {
+        if (try toUtf8Windows(mem, bytes)) |decoded| {
+            mem.free2(bytes);
+            return decoded;
+        }
+    }
+
+    const lossy = try latin1ToUtf8(mem, bytes);
+    mem.free2(bytes);
+    return lossy;
+}
+fn toUtf8Windows(mem: *Mem, bytes: []const u8) !?[]u8 {
+    const console_cp = windows.GetConsoleCP();
+    if (console_cp == windows.CP_UTF8) {
+        // 代码页已经是UTF-8，但字节无效，可能是损坏的数据
+        return error.InvalidUtf8;
+    }
+
+    const allocator = mem.allocator();
+    if (try tryDecodeWindowsCodePageToUtf8(allocator, bytes, console_cp)) |decoded| return decoded;
+
+    // Prefer GBK before ACP: Western single-byte ACPs like CP1252 will happily
+    // decode arbitrary high bytes into mojibake ("ÖÐÎÄ"), which would mask
+    // genuine GBK console output that we can still recover losslessly.
+    const ansi_cp = windows.GetACP();
+    if (console_cp != windows.CP_GBK and ansi_cp != windows.CP_GBK) {
+        if (try tryDecodeWindowsCodePageToUtf8(allocator, bytes, windows.CP_GBK)) |decoded| return decoded;
+    }
+
+    if (ansi_cp != console_cp) {
+        if (try tryDecodeWindowsCodePageToUtf8(allocator, bytes, ansi_cp)) |decoded| return decoded;
+    }
+
+    return null;
+}
+fn latin1ToUtf8(mem: *Mem, bytes: []const u8) ![]u8 {
+    var out = List.t(u8).a(mem);
+    errdefer out.d();
+
+    // try out.ensureTotalCapacity(allocator, bytes.len);
+
+    var i: usize = 0;
+    while (i < bytes.len) {
+        const byte = bytes[i];
+        if (byte < 0x80) {
+            try out.add(byte);
+            i += 1;
+            continue;
+        }
+
+        const seq_len = std.unicode.utf8ByteSequenceLength(byte) catch {
+            try out.addArray("\xEF\xBF\xBD");
+            i += 1;
+            continue;
+        };
+
+        const step: usize = @intCast(seq_len);
+        if (i + step > bytes.len) {
+            try out.addArray("\xEF\xBF\xBD");
+            i += 1;
+            continue;
+        }
+
+        const candidate = bytes[i .. i + step];
+        _ = std.unicode.utf8Decode(candidate) catch {
+            try out.addArray("\xEF\xBF\xBD");
+            i += 1;
+            continue;
+        };
+
+        try out.addArray(candidate);
+        i += step;
+    }
+
+    return try out.toArray();
+}
+fn tryDecodeWindowsCodePageToUtf8(
+    allocator: std.mem.Allocator,
+    bytes: []const u8,
+    code_page: windows.UINT,
+) !?[]u8 {
+    if (bytes.len == 0 or code_page == 0) return null;
+
+    const in_len: i32 = std.math.cast(i32, bytes.len) orelse return null;
+    // Keep UTF-8 strict so a console forced to CP_UTF8 does not swallow
+    // ACP/GBK bytes with U+FFFD substitutions before we can try fallbacks.
+    const decode_flags: windows.DWORD = if (code_page == windows.CP_UTF8) windows.MB_ERR_INVALID_CHARS else 0;
+
+    const wide_len = windows.MultiByteToWideChar(code_page, decode_flags, bytes.ptr, in_len, null, 0);
+    if (wide_len <= 0) return null;
+
+    const wide_len_usize: usize = @intCast(wide_len);
+    const wide = try allocator.alloc(u16, wide_len_usize);
+    defer allocator.free(wide);
+
+    if (windows.MultiByteToWideChar(code_page, decode_flags, bytes.ptr, in_len, wide.ptr, wide_len) <= 0) return null;
+
+    const utf8_len = windows.WideCharToMultiByte(windows.CP_UTF8, 0, wide.ptr, wide_len, null, 0, null, null);
+    if (utf8_len <= 0) return null;
+
+    const utf8_len_usize: usize = @intCast(utf8_len);
+    const out = try allocator.alloc(u8, utf8_len_usize);
+    errdefer allocator.free(out);
+
+    if (windows.WideCharToMultiByte(windows.CP_UTF8, 0, wide.ptr, wide_len, out.ptr, utf8_len, null, null) <= 0) return null;
+
+    return out;
+}
+/// 设置控制台UTF8编码，跨平台兼容
+pub fn setWindowsConsoleUtf8() void {
+    if (builtin.os.tag == .windows) {
+        // 调用声明的函数，将控制台输入输出代码页设置为 UTF-8 (65001)
+        _ = windows.SetConsoleCP(65001);       // 输入代码页
+        _ = windows.SetConsoleOutputCP(65001); // 输出代码页
+    }
+}
+''');
+
+pub fn output(self: *Console, message: str) !void {
+    const io = self.mem.io();
+    var out_buffer: [4096]u8 = undefined;
+    var writer = std.Io.File.stdout().writer(io, &out_buffer);
+    const stdout = &writer.interface;
+
+    try stdout.writeAll(message);
+    try stdout.flush();
+}
+// pub fn output2(self: *Console, comptime format: str, args: anytype) !void {
+//     const io = self.mem.io();
+//     var out_buffer: [4096]u8 = undefined;
+//     var writer = std.Io.File.stdout().writer(io, &out_buffer);
+//     const stdout = &writer.interface;
+
+//     try stdout.print(format, args);
+//     try stdout.flush();
+// }
+
+pub fn print(string: str) void {
+    std.debug.print("{s}", .{string});
+}
+pub fn println(string: str) void {
+    std.debug.print("{s}\n", .{string});
+}
+pub fn print2(comptime format: str, args: anytype) void {
+    std.debug.print(format, args);
+}

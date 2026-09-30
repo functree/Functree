@@ -1,0 +1,120 @@
+const Mem = import("../../Mem.func");
+const Io = import("../../Io.func");
+
+code(
+'''
+const std = @import("std");
+
+pub const RequestOptions = std.http.Client.RequestOptions;
+pub const FetchOptions = std.http.Client.FetchOptions;
+pub const FetchResult = std.http.Client.FetchResult;
+pub const Request = std.http.Client.Request;
+pub const Response = std.http.Client.Response;
+'''
+);
+
+pub fn get(mem: *Mem, url: str) !str {
+    const allocator = mem.allocator();
+    var wa: std.Io.Writer.Allocating = .init(allocator);
+    try wa.ensureUnusedCapacity(64);
+
+    var http_client: std.http.Client = .{ .allocator = allocator, .io = mem.io() };
+    defer http_client.deinit();
+    const res = try http_client.fetch(.{
+        .location = .{ .url = url },
+        .method = .GET,
+        .response_writer = &wa.writer,
+    });
+    if (res.status == .ok) {
+        return wa.writer.buffered();
+    } else {
+        return error.HttpFetchFail;
+    }
+}
+pub fn get2(mem: *Mem, url: str, headers: []str) !str {
+    const allocator = mem.allocator();
+    var wa: std.Io.Writer.Allocating = .init(allocator);
+    try wa.ensureUnusedCapacity(64);
+
+    var header_buf: [20]std.http.Header = undefined;
+    var header_count: usize = 0;
+    for (headers) |header| {
+        if (header_count >= header_buf.len) return error.TooManyHeaders;
+        header_buf[header_count] = parseHeader(header).?;
+        header_count += 1;
+    }
+
+    var http_client: std.http.Client = .{ .allocator = allocator, .io = mem.io() };
+    defer http_client.deinit();
+    const res = try http_client.fetch(.{
+        .location = .{ .url = url },
+        .method = .GET,
+        .extra_headers = header_buf[0..header_count],
+        .response_writer = &wa.writer,
+    });
+    if (res.status == .ok) {
+        return wa.writer.buffered();
+    } else {
+        return error.HttpFetchFail;
+    }
+}
+
+pub fn post(mem: *Mem, url: str, data: str) ![]u8 {
+    const allocator = mem.allocator();
+    var wa: std.Io.Writer.Allocating = .init(allocator);
+    try wa.ensureUnusedCapacity(64);
+
+    var http_client: std.http.Client = .{ .allocator = allocator, .io = mem.io() };
+    defer http_client.deinit();
+    const res = try http_client.fetch(.{
+        .location = .{ .url = url },
+        .method = .POST,
+        .payload = data,
+        .response_writer = &wa.writer,
+    });
+    _=res;
+    //if (res.status == .ok or res.status == .not_found) {
+        return wa.writer.buffered();
+    //} else {
+    //   return error.HttpFetchFail;
+    //}
+}
+pub fn post2(mem: *Mem, url: str, data: str, headers: []str) ![]u8 {
+    const allocator = mem.allocator();
+    var wa: std.Io.Writer.Allocating = .init(allocator);
+    try wa.ensureUnusedCapacity(64);
+
+    var header_buf: [20]std.http.Header = undefined;
+    var header_count: usize = 0;
+    for (headers) |header| {
+        if (header_count >= header_buf.len) return error.TooManyHeaders;
+        header_buf[header_count] = parseHeader(header).?;
+        header_count += 1;
+    }
+
+    var http_client: std.http.Client = .{ .allocator = allocator, .io = mem.io() };
+    defer http_client.deinit();
+    const res = try http_client.fetch(.{
+        .location = .{ .url = url },
+        .method = .POST,
+        .payload = data,
+        .extra_headers = header_buf[0..header_count],
+        .response_writer = &wa.writer,
+    });
+    _=res;
+    //if (res.status == .ok or res.status == .not_found) {
+        return wa.writer.buffered();
+    //} else {
+    //   return error.HttpFetchFail;
+    //}
+}
+
+fn parseHeader(header: []const u8) ?std.http.Header {
+    const colon = std.mem.indexOfScalar(u8, header, ':');
+    if (colon == null) return null;
+    const name = std.mem.trim(u8, header[0..colon.?], " \t\r\n");
+    const value = std.mem.trim(u8, header[colon.? + 1 ..], " \t\r\n");
+    if (name.len == 0) return null;
+
+    return .{ .name = name, .value = value };
+}

@@ -1,0 +1,69 @@
+const Mem = import("../../Mem.func");
+const DataType = import("../../DataType.func");
+const String = DataType.String;
+const Json = DataType.Json;
+const JsonValue = Json.JsonValue;
+
+code(
+'''
+const std = @import("std");
+
+const Array = std.json.Array;
+
+mem: *Mem,
+array: Array, // Array's item is JsonValue
+
+pub fn a(mem: *Mem) JsonArray {
+    return JsonArray{
+        .mem = mem,
+        .array = Array.init(mem.allocator()),
+    };
+}
+pub fn a2(mem: *Mem, array: Array) JsonArray {
+    return JsonArray{
+        .mem = mem,
+        .array = array,
+    };
+}
+pub fn parse(mem: *Mem, json_str: []const u8) !JsonArray {
+    const parsed = try std.json.parseFromSlice(JsonValue, mem.allocator(), json_str, .{});
+    return JsonArray{
+        .mem = mem,
+        .array = parsed.value.array,
+    };
+}
+pub fn d(self: *JsonArray) void {
+    self.array.deinit();
+}
+
+pub fn values(self: JsonArray) []JsonValue {
+    return self.array.items;
+}
+pub fn count(self: JsonArray) usize {
+    return self.array.items.len;
+}
+pub fn add(self: *JsonArray, value: anytype) !void {
+    const json_value = try Json.getJsonValue(self.mem, value);
+    try self.array.append(json_value.*);
+}
+pub fn add2(self: *JsonArray, i: usize, value: anytype) !void {
+    const json_value = try Json.getJsonValue(self.mem, value);
+    try self.array.insert(i, json_value.*);
+}
+pub fn addArray(self: *JsonArray, slice: []const JsonValue) !void {
+    try self.array.appendSlice(slice);
+}
+pub fn addArray2(self: *JsonArray, i: usize, slice: []const JsonValue) !void {
+    try self.array.insertSlice(i, slice);
+}
+pub fn toArray(self: *JsonArray) ![]JsonValue {
+    return try self.array.toOwnedSlice();
+}
+'''
+);
+pub fn toStr(self: JsonArray) ![]u8 {
+    const json_value: JsonValue = .{.array = self.array};
+    const total_size: usize = 1024000;
+    const buffer = try self.mem.alloc2(u8, total_size);
+    return try Json.toStr(buffer, json_value);
+}
