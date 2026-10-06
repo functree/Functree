@@ -43,7 +43,7 @@ pub fn getHostFromUrl(url: []const u8) ?[]const u8 {
     return host;
 }
 
-pub fn lookupIpAddress(mem: *Mem, host: []const u8, port: u16) !?IpAddress {
+pub fn lookupIpAddress(mem: *Mem, host: []const u8) !?IpAddress {
     const io = mem.io();
 
     var canonical_name_buffer: [std.Io.net.HostName.max_len]u8 = undefined;
@@ -54,12 +54,10 @@ pub fn lookupIpAddress(mem: *Mem, host: []const u8, port: u16) !?IpAddress {
         .port = 80,
         .canonical_name_buffer = &canonical_name_buffer,
     });
-    const result = try results.getOne(io);
-    if (result) |res| {
-        switch (res) {
-            .address => return try std.Io.net.IpAddress.resolve(io, res.address, port),
-            .canonical_name => return null,
-        }
+    const res = try results.getOne(io);
+    switch (res) {
+        .address => return res.address,
+        .canonical_name => return null,
     }
     return null;
 }

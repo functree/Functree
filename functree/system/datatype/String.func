@@ -63,6 +63,11 @@ pub fn lastIndexOf(self: String, needle: str) ?usize {
 pub fn equal(self: String, value: String) bool {
     return std.mem.eql(u8, self.bytes, value.bytes);
 }
+pub fn equalIgnoreCase(self: String, value: String) bool {
+    const v1 = self.lower() catch return false;
+    const v2 = value.lower() catch return false;
+    return std.mem.eql(u8, v1.bytes, v2.bytes);
+}
 pub fn count(self: String, needle: str) usize {
     return std.mem.count(u8, self.bytes, needle);
 }
@@ -338,6 +343,16 @@ pub fn countStr(value: str, needle: str) usize {
 
 pub fn equalStr(value1: str, value2: str) bool {
     return std.mem.eql(u8, value1, value2);
+}
+pub fn equalIgnoreCaseStr(value1: str, value2: str) bool {
+    // a Heap
+    var mem = Mem.a();
+    // auto free memory
+    mem.f();
+    defer mem.d();
+    const value1_lower = lowerStr(&mem, value1) catch return false;
+    const value2_lower = lowerStr(&mem, value2) catch return false;
+    return std.mem.eql(u8, value1_lower, value2_lower);
 }
 
 /// Find the index in a slice of a sub-slice, searching from the start.
