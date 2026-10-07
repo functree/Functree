@@ -1,15 +1,12 @@
-pub const OpenFileError = std.Io.File.OpenError;
-pub const DeleteFileError = std.Io.Dir.DeleteFileError;
 pub const Reader = std.Io.File.Reader;
 pub const Writer = std.Io.File.Writer;
-pub const ReadError = std.Io.File.ReadError;
-pub const WriteError = std.Io.File.WriteError;
 
 pub const Kind = std.Io.File.Kind;
-pub const OpenMode = std.Io.File.OpenMode;
-pub const OpenFlags = std.Io.File.OpenFlags;
-pub const CreateFlags = std.Io.File.CreateFlags;
-pub const WriteFileOptions = std.Io.File.WriteFileOptions;
+pub const CreateFileOptions = std.Io.Dir.CreateFileOptions;
+pub const OpenFileOptions = std.Io.Dir.OpenFileOptions;
+pub const OpenFileError = std.Io.File.OpenError;
+pub const WriteFileOptions = std.Io.Dir.WriteFileOptions;
+pub const DeleteFileError = std.Io.Dir.DeleteFileError;
 pub const Stat = std.Io.File.Stat;
 
 const System = @import("../../System.zig");
@@ -114,7 +111,7 @@ pub fn create(memory: *Memory, absolute_path: []const u8) OpenFileError!File {
         .io = io,
     };
 }
-pub fn create2(memory: *Memory, absolute_path: []const u8, create_flags: CreateFlags) OpenFileError!File {
+pub fn create2(memory: *Memory, absolute_path: []const u8, create_flags: CreateFileOptions) OpenFileError!File {
     const io = memory.io();
     const file = try std.Io.Dir.createFileAbsolute(io, absolute_path, create_flags);
     return File{
@@ -140,7 +137,7 @@ pub fn open(memory: *Memory, file_path: []const u8) OpenFileError!File {
         .io = io,
     };
 }
-pub fn open2(memory: *Memory, file_path: []const u8, open_flags: OpenFlags) OpenFileError!File {
+pub fn open2(memory: *Memory, file_path: []const u8, open_flags: OpenFileOptions) OpenFileError!File {
     const io = memory.io();
     var file: ?std.Io.File = null;
     if (std.fs.path.isAbsolute(file_path)) {

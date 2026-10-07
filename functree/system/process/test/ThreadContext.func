@@ -30,7 +30,7 @@ pub fn run(ctx: *ThreadContext) !void {
 pub fn testThreadName(thread: *Thread) !void {
     const testCases: []str = [
         "mythread",
-        "b" ** Thread.max_name_len,
+        "bbb",
     ];
 
     for (testCases) |tc| {

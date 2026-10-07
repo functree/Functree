@@ -27,7 +27,7 @@ pub fn input(self: *Console, delimiter: u8) ![]const u8 {
 
 const builtin = @import("builtin");
 // 手动定义 Windows API 调用约定
-const WINAPI: std.builtin.CallingConvention = switch (builtin.cpu.arch) {
+const WINAPI: std.lang.CallingConvention = switch (builtin.target.cpu.arch) {
     .x86 => .stdcall,
     else => .c,
 };
@@ -39,7 +39,7 @@ const BOOL = i32;
 extern "kernel32" fn SetConsoleOutputCP(wCodePageID: UINT) callconv(WINAPI) BOOL;
 /// 设置控制台UTF8编码，跨平台兼容
 pub fn setWindowsConsoleUtf8() void {
-    if (builtin.os.tag != .windows) return;
+    if (builtin.target.os.tag != .windows) return;
 
     // 调用声明的函数，将控制台输出代码页设置为 UTF-8 (65001)
     _ = SetConsoleOutputCP(65001);

@@ -13,12 +13,12 @@ pub const String = @import("datatype/String.zig");
 // pub const Tensor = @import("functree_system_datatype_Tensor.zig");
 
 const std = @import("std");
-const builtin = std.builtin;
+const lang = std.lang;
 
 pub inline fn typeOf(value: anytype) type {
     return @TypeOf(value);
 }
-pub inline fn typeInfo(comptime T: type) builtin.Type {
+pub inline fn typeInfo(comptime T: type) lang.Type {
     return @typeInfo(T);
 }
 pub inline fn typeName(T: type) []const u8 {
@@ -92,8 +92,8 @@ pub inline fn pow(comptime T: type, value1: anytype, value2: anytype) T {
 pub inline fn intCast(comptime T: type, value: anytype) T {
     return @as(T, @intCast(value));
 }
-pub inline fn intFromEnum(comptime T: type, value: anytype) T {
-    return @as(T, @intFromEnum(value));
+pub inline fn backToInt(comptime T: type, value: anytype) T {
+    return @as(T, @backingInt(value));
 }
 pub inline fn intFromFloat(comptime T: type, value: anytype) T {
     return @as(T, @intFromFloat(value));

@@ -219,8 +219,8 @@ pub fn compare(self: DateTime, value: DateTime) i8 {
     } else if (self.nanosecond < value.nanosecond) {
         return -1;
     }
-    const self_timezone = DataType.intFromEnum(i8, self.timezone);
-    const value_timezone = DataType.intFromEnum(i8, value.timezone);
+    const self_timezone = DataType.backToInt(i8, self.timezone);
+    const value_timezone = DataType.backToInt(i8, value.timezone);
     if (self_timezone > value_timezone) {
         return 1;
     } else if (self_timezone < value_timezone) {
@@ -501,7 +501,7 @@ pub fn parse2(value: str, format: str) !DateTime {
 }
 
 pub fn setTimezone(self: *DateTime, _timezone: TimeZone) void {
-    const hours = DataType.intFromEnum(i32, _timezone);
+    const hours = DataType.backToInt(i32, _timezone);
     self.addHour(hours);
     self.timezone = _timezone;
 }

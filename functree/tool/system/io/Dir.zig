@@ -162,7 +162,7 @@ pub fn createFile(self: *Dir, sub_path: []const u8) !File {
         .io = self.io,
     };
 }
-pub fn createFile2(self: *Dir, sub_path: []const u8, flags: File.CreateFlags) !File {
+pub fn createFile2(self: *Dir, sub_path: []const u8, flags: File.CreateFileOptions) !File {
     const file = try self.dir.createFile(self.io, sub_path, flags);
     return File{
         .file = file,

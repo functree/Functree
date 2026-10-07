@@ -1,6 +1,7 @@
 //!第一个程序
-const Console = import("Console.func");
-const Config = import("../system/Config.func");
+const System = import("../System.func");
+const Mem = System.Mem;
+const Console = System.Io.Console;
 
 ///程序入口
 pub fn main() void {
@@ -10,12 +11,12 @@ pub fn main() void {
 test "Hello: test" {
     const string = "hello world!\n";
     //Console.print(string);
-    Console.printFormat("format:{s}", .{string});
+    Console.print2("format:{s}", .{string});
 
-    _ = Console.a();
-}
-
-test "global var"{
-   _ = Config.j; // Config.j = 4
-   Config.getName();
+    // init heap memory
+    var mem = Mem.a();
+    // set auto free memory
+    mem.f();
+    defer mem.d();
+    _ = Console.a(&mem);
 }

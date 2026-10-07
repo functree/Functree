@@ -1,5 +1,6 @@
 const std = @import("std");
-pub const Heap = std.heap.DebugAllocator(.{});
+// pub const Heap = std.heap.DebugAllocator(.{});
+pub const Heap = std.heap.SafeAllocator;
 
 pub const Allocator = std.mem.Allocator;
 pub const Alignment = std.mem.Alignment;
@@ -21,7 +22,7 @@ threaded: ?std.Io.Threaded = null,
 
 pub fn a() Memory {
     return Memory{
-        .heap = .init,
+        .heap = .init(std.heap.page_allocator, .{}),
     };
 }
 

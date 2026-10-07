@@ -4,7 +4,7 @@ code(
 '''
 const std = @import("std");
 const builtin = @import("builtin");
-const AtomicOrder = std.builtin.AtomicOrder;
+const AtomicOrder = std.lang.AtomicOrder;
 
 pub fn t(comptime T: type) type {
     return extern struct {
@@ -113,7 +113,7 @@ pub fn t(comptime T: type) type {
 
         pub inline fn rmw(
             self: *Self,
-            comptime op: std.builtin.AtomicRmwOp,
+            comptime op: std.lang.AtomicRmwOp,
             operand: T,
             comptime order: AtomicOrder,
         ) T {

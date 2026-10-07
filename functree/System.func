@@ -27,14 +27,14 @@ pub fn getTotalMemory() !u64 {
 
 pub fn getOs() Os {
     const os = Os{
-        .tag = builtin.os.tag,
-        .version_range = builtin.os.version_range,
+        .tag = builtin.target.os.tag,
+        .version_range = builtin.target.os.version_range,
     };
     return os;
 }
 
 pub fn getAbi() Os.Abi {
-    return builtin.abi;
+    return builtin.target.abi;
 }
 
 pub fn getObjectFormat(os_tag: Os.Tag, arch: Cpu.Arch) Os.ObjectFormat {
@@ -43,8 +43,8 @@ pub fn getObjectFormat(os_tag: Os.Tag, arch: Cpu.Arch) Os.ObjectFormat {
 
 pub fn getCpu() Cpu {
     const cpu = Cpu{
-        .arch = builtin.cpu.arch,
-        .features = builtin.cpu.features,
+        .arch = builtin.target.cpu.arch,
+        .features = builtin.target.cpu.features,
     };
     return cpu;
 }

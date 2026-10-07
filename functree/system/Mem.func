@@ -7,8 +7,9 @@ pub const HeapArena = std.heap.ArenaAllocator;
 code(
 '''
 const std = @import("std");
-//pub const Heap = std.heap.GeneralPurposeAllocator(.{});
-pub const Heap = std.heap.DebugAllocator(.{});
+// pub const Heap = std.heap.GeneralPurposeAllocator(.{});
+// pub const Heap = std.heap.DebugAllocator(.{});
+pub const Heap = std.heap.SafeAllocator;
 '''
 );
 
@@ -28,7 +29,7 @@ threaded: ?std.Io.Threaded = null,
 /// init a heap, must manually free the memory by 'd()' method
 pub fn a() Mem {
     return Mem{
-        .heap = .init,
+        .heap = .init(std.heap.page_allocator, .{}),
     };
 }
 

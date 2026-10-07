@@ -21,8 +21,8 @@ pub fn parse2(comptime T: type, value: str) !T {
 }
 
 pub fn toStr(mem: *Mem, value: anytype) ![]u8 {
-    return try std.fmt.allocPrint(mem.allocator(), "{d}", .{ value });
+    return try mem.allocator().print("{d}", .{ value });
 }
 pub fn toStr2(buffer: []u8, value: anytype) ![]u8 {
-    return try std.fmt.bufPrint(buffer, "{d}", .{ value });
+    return try std.mem.print(buffer, "{d}", .{ value });
 }

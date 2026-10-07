@@ -8,19 +8,15 @@ code(
 '''
 const std = @import("std");
 
-pub const OpenFileError = std.Io.File.OpenError;
-pub const DeleteFileError = std.Io.Dir.DeleteFileError;
 pub const Reader = std.Io.File.Reader;
 pub const Writer = std.Io.File.Writer;
-pub const ReadError = std.Io.File.ReadError;
-pub const WriteError = std.Io.File.WriteError;
 
 pub const Kind = std.Io.File.Kind;
-pub const OpenMode = std.Io.File.OpenMode;
-pub const OpenFlags = std.Io.File.OpenFlags;
-pub const OpenError = std.Io.File.OpenError;
-pub const CreateFlags = std.Io.File.CreateFlags;
-pub const WriteFileOptions = std.Io.File.WriteFileOptions;
+pub const CreateFileOptions = std.Io.Dir.CreateFileOptions;
+pub const OpenFileOptions = std.Io.Dir.OpenFileOptions;
+pub const OpenFileError = std.Io.File.OpenError;
+pub const WriteFileOptions = std.Io.Dir.WriteFileOptions;
+pub const DeleteFileError = std.Io.Dir.DeleteFileError;
 pub const Stat = std.Io.File.Stat;
 
 file: std.Io.File,
@@ -128,7 +124,7 @@ pub fn create2(mem: *Mem, absolute_path: str, io: std.Io) OpenFileError!File {
     return try create3(mem, absolute_path, io, .{.read = true, .truncate = true});
 }
 /// create a file with io
-pub fn create3(mem: *Mem, absolute_path: str, io: std.Io, flags: CreateFlags) OpenFileError!File {
+pub fn create3(mem: *Mem, absolute_path: str, io: std.Io, flags: CreateFileOptions) OpenFileError!File {
     const file = try std.Io.Dir.createFileAbsolute(io, absolute_path, flags);
 
     return File{.file=file, .mem=mem, .io=io};

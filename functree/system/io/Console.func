@@ -78,7 +78,7 @@ const windows = struct {
 fn toUtf8Str(mem: *Mem, bytes: []const u8) ![]u8 {
     if (std.unicode.utf8ValidateSlice(bytes)) return try String.copyStr(mem, bytes);
 
-    if (comptime builtin.os.tag == .windows) {
+    if (comptime builtin.target.os.tag == .windows) {
         if (try toUtf8Windows(mem, bytes)) |decoded| {
             mem.free2(bytes);
             return decoded;
@@ -188,7 +188,7 @@ fn tryDecodeWindowsCodePageToUtf8(
 }
 /// 设置控制台UTF8编码，跨平台兼容
 pub fn setWindowsConsoleUtf8() void {
-    if (builtin.os.tag == .windows) {
+    if (builtin.target.os.tag == .windows) {
         // 调用声明的函数，将控制台输入输出代码页设置为 UTF-8 (65001)
         _ = windows.SetConsoleCP(65001);       // 输入代码页
         _ = windows.SetConsoleOutputCP(65001); // 输出代码页

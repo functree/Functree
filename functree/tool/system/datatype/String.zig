@@ -199,10 +199,10 @@ pub fn joinStr(memory: *Memory, separator: []const u8, slices: []const []const u
 }
 
 pub fn formatStr(memory: *Memory, comptime fmt: []const u8, values: anytype) ![]u8 {
-    return try std.fmt.allocPrint(memory.allocator(), fmt, values);
+    return try memory.allocator().print(fmt, values);
 }
 pub fn formatStr2(buffer: []u8, comptime fmt: []const u8, values: anytype) ![]u8 {
-    return try std.fmt.bufPrint(buffer, fmt, values);
+    return try std.mem.print(buffer, fmt, values);
 }
 
 pub fn replaceStr(memory: *Memory, value: []const u8, needle: []const u8, replacement: []const u8) ![]u8 {

@@ -16,7 +16,7 @@ pub const Tensor = import("datatype/Tensor.func");
 code(
 '''
 const std = @import("std");
-const builtin = std.builtin;
+const lang = std.lang;
 
 // ── 类型转换 ──
 pub inline fn cast(comptime T: type, value: anytype) T {
@@ -32,8 +32,8 @@ pub inline fn truncate(value: anytype) @TypeOf(value) {
 pub inline fn intCast(comptime T: type, value: anytype) T {
     return @as(T, @intCast(value));
 }
-pub inline fn intFromEnum(comptime T: type, value: anytype) T {
-    return @as(T, @intFromEnum(value));
+pub inline fn backToInt(comptime T: type, value: anytype) T {
+    return @as(T, @backingInt(value));
 }
 pub inline fn intFromFloat(comptime T: type, value: anytype) T {
     return @as(T, @intFromFloat(value));
@@ -49,7 +49,7 @@ pub inline fn floatFromInt(comptime T: type, value: anytype) T {
 pub inline fn typeOf(value: anytype) type {
     return @TypeOf(value);
 }
-pub inline fn typeInfo(comptime T: type) builtin.Type {
+pub inline fn typeInfo(comptime T: type) lang.Type {
     return @typeInfo(T);
 }
 pub inline fn typeName(T: type) []const u8 {
