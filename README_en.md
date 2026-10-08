@@ -34,7 +34,8 @@
 
  `First function unit source file functree/app/Hello.func:`
  ```
-const Console = import("Console.func");
+const System = import("../System.func");
+const Console = System.Io.Console;
 
 pub fn main() void {
     Console.print("Hello, world!\n");
@@ -53,8 +54,10 @@ Hello, world!
 
 Line comments start with `//` and extend to the end of the line, e.g., `//print("Hello?");`
  ```
-const Console = import("Console.func");
+const System = import("../System.func");
+const Console = System.Io.Console;
 const print = Console.print;
+
 pub fn main() void {
     //print("Hello?");
     print("Hello, world!\n");
@@ -63,8 +66,10 @@ pub fn main() void {
 
 Documentation comment lines start with `///`, e.g., `///Program entry point`
  ```
-const Console = import("Console.func");
+const System = import("../System.func");
+const Console = System.Io.Console;
 const print = Console.print;
+
 ///Program entry point
 pub fn main() void {
     //print("Hello?");
@@ -75,8 +80,10 @@ pub fn main() void {
 Whole-file comments start with `//!`. File comment lines must be placed at the very beginning of the file, e.g., `//!File description`
  ```
 //!File description
-const Console = import("Console.func");
+const System = import("../System.func");
+const Console = System.Io.Console;
 const print = Console.print;
+
 ///Program entry point
 pub fn main() void {
     //print("Hello?");
@@ -597,7 +604,7 @@ Operator precedence:
 2  x!y
 3  x{}
 4  !x -x ~x &x ?x
-5  * / % ** ||
+5  * / % ||
 6  + - ++
 7  << >>
 8  & ^ | catch
@@ -1164,8 +1171,9 @@ pub fn main() void {
 Syntax: `const FuncName = import(comptime func_path: str);`.  
 This function imports a **function unit file** based on the `func_path`, the **function unit file name** should be used as the variable name, their names start with an uppercase letter (**TitleCase**):
  ```
-const Config = import("../system/Config.func");
-const Console = import("Console.func");
+const Config = import("../Config.func");
+const System = import("../System.func");
+const Console = System.Io.Console;
 const print = Console.print;
 
 pub fn main() void {

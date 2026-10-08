@@ -34,7 +34,8 @@
 
  `第一个功件源文件functree/app/Hello.func:`
  ```
-const Console = import("Console.func");
+const System = import("../System.func");
+const Console = System.Io.Console;
 
 pub fn main() void {
     Console.print("Hello, world!\n");
@@ -53,8 +54,10 @@ Hello, world!
   
 代码行注释以 `//` 开头到行尾，如下列代码：`//print("Hello?");`
  ```
-const Console = import("Console.func");
+const System = import("../System.func");
+const Console = System.Io.Console;
 const print = Console.print;
+
 pub fn main() void {
     //print("Hello?");
     print("Hello, world!\n");
@@ -63,8 +66,10 @@ pub fn main() void {
 
 文档注释行以 `///` 开始，如下列代码：`///程序入口`
  ```
-const Console = import("Console.func");
+const System = import("../System.func");
+const Console = System.Io.Console;
 const print = Console.print;
+
 ///程序入口
 pub fn main() void {
     //print("Hello?");
@@ -75,8 +80,10 @@ pub fn main() void {
 整个文件的注释以 `//!` 开始，文件注释行只能放在文件的最前面，如下列代码：`//!文件说明`
  ```
 //!文件说明
-const Console = import("Console.func");
+const System = import("../System.func");
+const Console = System.Io.Console;
 const print = Console.print;
+
 ///程序入口
 pub fn main() void {
     //print("Hello?");
@@ -598,7 +605,7 @@ test "global var"{
 2  x!y
 3  x{}
 4  !x -x ~x &x ?x
-5  * / %
+5  * / % ||
 6  + - ++
 7  << >>
 8  & ^ | catch
@@ -1167,8 +1174,9 @@ pub fn main() void {
 语法：`const FuncName = import(comptime relative_path: str);`。  
 这个功能将根据 `relative_path` 路径引入**功件文件**，应将**功件文件名称**作为变量名称，且其首字母为大写（**TitleCase**）：
  ```
-const Config = import("../system/Config.func");
-const Console = import("Console.func");
+const Config = import("../Config.func");
+const System = import("../System.func");
+const Console = System.Io.Console;
 const print = Console.print;
 
 pub fn main() void {
