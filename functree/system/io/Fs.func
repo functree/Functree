@@ -10,7 +10,7 @@ const std = @import("std");
 '''
 );
 
-pub fn isAbsolutePath(path: str) bool {
+pub fn isAbsPath(path: str) bool {
     return std.fs.path.isAbsolute(path);
 }
 

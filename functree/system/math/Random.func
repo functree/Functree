@@ -66,6 +66,6 @@ pub fn float(self: Random, comptime T: type) T {
 /// Threadsafe.
 ///
 /// See also `random`.
-pub fn randomBuf(mem: *Mem, buffer: []u8) !void {
+pub fn randBuf(mem: *Mem, buffer: []u8) !void {
     return try std.Io.randomSecure(mem.io(), buffer);
 }

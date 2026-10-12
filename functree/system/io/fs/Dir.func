@@ -135,7 +135,7 @@ code('''
 /// get a temp dir's absolute path
 pub fn getTempDir(mem: *Mem) !Dir {
     const io = mem.io();
-    const random_dir_name = try getRandomName(mem.allocator(), 16);
+    const random_dir_name = try getRandName(mem.allocator(), 16);
     const temp_dir_path = try Fs.joinPath(mem, &.{".cache/tmp", random_dir_name});
     const cwd = std.Io.Dir.cwd();
     const dir = try cwd.createDirPathOpen(io, temp_dir_path, .{.open_options = .{.iterate = true}});
@@ -148,7 +148,7 @@ pub fn getTempDir(mem: *Mem) !Dir {
     //const dir = try std.Io.Dir.openDirAbsolute(io, absolute_path, .{.iterate = true});
     return Dir{.dir=dir, .mem=mem, .io=io};
 }
-fn getRandomName(alloc: std.mem.Allocator, length: usize) ![]u8 {
+fn getRandName(alloc: std.mem.Allocator, length: usize) ![]u8 {
     var rand = std.Random.DefaultPrng.init(0);
     const r = rand.random();
     const char_set = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -189,7 +189,7 @@ pub fn createDirPath(mem: *Mem, absolute_path: str) !void {
 }
 /// create all not exist directory, based on an absolute path.
 pub fn createDirPathAll(mem: *Mem, absolute_path: str) !void {
-    if (!Fs.isAbsolutePath(absolute_path)) return error.NotAbsolutePath;
+    if (!Fs.isAbsPath(absolute_path)) return error.NotAbsolutePath;
 
     const io = mem.io();
     var new_path = try String.replaceStr(mem, absolute_path, "\\", "/");

@@ -798,27 +798,20 @@ test "Char: isControl isDigit isDigit" {
     try expect(Char.isLower('z'));
 }
 
-test "Char: isUtf8Codepoint" {
-    try expect(Char.isUtf8Codepoint('e'));
-    try expect(Char.isUtf8Codepoint('中'));
+test "Char: isUtf8" {
+    try expect(Char.isUtf8('e'));
+    try expect(Char.isUtf8('中'));
 }
 
-test "Char: utf8Encode and utf8Decode" {
-    const codepoint = try Char.utf8Decode("𐍈");
-    const s1 = try Char.utf8Encode(codepoint);
+test "Char: utf8Enc and utf8Dec" {
+    const codepoint = try Char.utf8Dec("𐍈");
+    const s1 = try Char.utf8Enc(codepoint);
 
     try expect(codepoint == 66376);
     try expect(s1[0] == 0b11110000);
     try expect(s1[1] == 0b10010000);
     try expect(s1[2] == 0b10001101);
     try expect(s1[3] == 0b10001000);
-}
-
-test "Char: getUtf8Iter" {
-    var it = try Char.getUtf8Iter("abc");
-    while (s1 in it.nextCodepointSlice()) {
-        Console.println(s1);
-    }
 }
 
 
@@ -887,12 +880,12 @@ test "String: split" {
     try expect(String.equalStr(string_array[1].toStr(), "def"));
 }
 
-test "String: toUtf8Array" {
+test "String: utf8Array" {
     var buffer: [300]u8 = undefined;
     var mem = Mem.as(&buffer);
 
     const string = try String.a(&mem, "abc中文123");
-    const str_array = try string.toUtf8Array();
+    const str_array = try string.utf8Array();
 
     try expect(String.equalStr(str_array[3], "中"));
 }
@@ -1072,6 +1065,13 @@ test "String: trimRightStr" {
     const string_trim = String.trimRightStr(string);
 
     try expect(String.equalStr(string_trim, " abc"));
+}
+
+test "String: utf8Iter" {
+    var it = try String.utf8Iter("abc");
+    while (s1 in it.nextCodepointSlice()) {
+        Console.println(s1);
+    }
 }
 
 

@@ -43,7 +43,7 @@ pub fn getHostFromUrl(url: []const u8) ?[]const u8 {
     return host;
 }
 
-pub fn lookupIpAddress(mem: *Mem, host: []const u8) !?IpAddress {
+pub fn lookupIpAddr(mem: *Mem, host: []const u8) !?IpAddress {
     const io = mem.io();
 
     var canonical_name_buffer: [std.Io.net.HostName.max_len]u8 = undefined;

@@ -6,6 +6,7 @@ code(
 '''
 const std = @import("std");
 const unicode = std.unicode;
+pub const Utf8Iterator = unicode.Utf8Iterator;
 '''
 );
 
@@ -63,7 +64,7 @@ pub fn lastIndexOf(self: String, needle: str) ?usize {
 pub fn equal(self: String, value: String) bool {
     return std.mem.eql(u8, self.bytes, value.bytes);
 }
-pub fn equalIgnoreCase(self: String, value: String) bool {
+pub fn equalIc(self: String, value: String) bool {
     const v1 = self.lower() catch return false;
     const v2 = value.lower() catch return false;
     return std.mem.eql(u8, v1.bytes, v2.bytes);
@@ -74,7 +75,7 @@ pub fn count(self: String, needle: str) usize {
 
 /// Truncate a UTF-8 slice to at most `max_len` bytes without splitting
 /// a multi-byte sequence. Backs up over trailing continuation bytes (0x80..0xBF).
-pub fn truncateUtf8(self: String, max_len: usize) String {
+pub fn subUtf8(self: String, max_len: usize) String {
     if (self.bytes.len <= max_len) return self.bytes;
     var end: usize = max_len;
     while (end > 0 and self.bytes[end] & 0xC0 == 0x80) {
@@ -86,16 +87,16 @@ pub fn truncateUtf8(self: String, max_len: usize) String {
     };
 }
 ///To UTF-8 Char Array
-pub fn toUtf8Array(self: String) ![]str {
-    var list = try self.toUtf8List();
+pub fn utf8Array(self: String) ![]str {
+    var list = try self.utf8List();
     return try list.toArray();
 }
 ///To UTF-8 Char List
-pub fn toUtf8List(self: String) !List.t([]u8) {
-    var list = List.t([]u8).a(self.mem);
+pub fn utf8List(self: String) !List.t(str) {
+    var list = List.t(str).a(self.mem);
     errdefer list.d();
 
-    var it = try Char.getUtf8Iter(self.bytes);
+    var it = try utf8Iter(self.bytes);
     while (it.nextCodepointSlice()) |buffer| {
         try list.add(try self.mem.allocator().dupe(u8, buffer));
     }
@@ -255,13 +256,18 @@ pub fn isNumberStr(value: str) bool {
     if (hasSign) singn_count = 1;
     return i > singn_count;
 }
+
 /// Returns true if the input str is UTF-8
 pub fn isUtf8Str(value: str) bool {
     return unicode.utf8ValidateSlice(value);
 }
+/// get Utf8Iterator of the given str.
+pub fn utf8Iter(value: str) !Utf8Iterator {
+    return (try unicode.Utf8View.init(value)).iterator();
+}
 /// Truncate a UTF-8 slice to at most `max_len` bytes without splitting
 /// a multi-byte sequence. Backs up over trailing continuation bytes (0x80..0xBF).
-pub fn truncateUtf8Str(value: str, max_len: usize) str {
+pub fn subUtf8Str(value: str, max_len: usize) str {
     if (value.len <= max_len) return value;
     var end: usize = max_len;
     while (end > 0 and value[end] & 0xC0 == 0x80) {
@@ -270,18 +276,18 @@ pub fn truncateUtf8Str(value: str, max_len: usize) str {
     return value[0..end];
 }
 ///To UTF-8 Char Array
-pub fn toUtf8ArrayStr(mem: *Mem, value: str) ![]str {
-    var list = try toUtf8ListStr(mem, value);
+pub fn utf8ArrayStr(mem: *Mem, value: str) ![]str {
+    var list = try utf8ListStr(mem, value);
     return try list.toArray();
 }
-///To UTF-8 Char List
-pub fn toUtf8ListStr(mem: *Mem, value: str) !List.t([]u8) {
-    var list = List.t([]u8).a(mem);
+/// get utf8 char List of the given str.
+pub fn utf8ListStr(mem: *Mem, value: str) !List.t(str) {
+    var list = List.t(str).a(mem);
     errdefer list.d();
 
-    var it = try Char.getUtf8Iter(value);
-    while (it.nextCodepointSlice()) |buffer| {
-        try list.add(try mem.allocator().dupe(u8, buffer));
+    var iter = try utf8Iter(value);
+    while (iter.nextCodepointSlice()) |string| {
+        try list.add(try copyStr(mem, string));
     }
     return list;
 }
@@ -344,7 +350,7 @@ pub fn countStr(value: str, needle: str) usize {
 pub fn equalStr(value1: str, value2: str) bool {
     return std.mem.eql(u8, value1, value2);
 }
-pub fn equalIgnoreCaseStr(value1: str, value2: str) bool {
+pub fn equalIcStr(value1: str, value2: str) bool {
     // a Heap
     var mem = Mem.a();
     // auto free memory
