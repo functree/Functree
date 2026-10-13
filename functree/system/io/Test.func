@@ -49,9 +49,9 @@ test "Dir: a" {
     mem.f();
     defer mem.d();
 
-    var tmp_dir = try Dir.getTempDir(&mem);
+    var tmp_dir = try Dir.getTmpDir(&mem);
     defer tmp_dir.d();
-    const tmp_dir_path = try tmp_dir.getAbsolutePath();
+    const tmp_dir_path = try tmp_dir.getAbsPath();
 
     var dir = try Dir.a(&mem, tmp_dir_path);
     defer dir.d();
@@ -71,9 +71,9 @@ test "Dir: a2" {
     mem.f();
     defer mem.d();
 
-    var tmp_dir = try Dir.getTempDir(&mem);
+    var tmp_dir = try Dir.getTmpDir(&mem);
     defer tmp_dir.d();
-    const tmp_dir_path = try tmp_dir.getAbsolutePath();
+    const tmp_dir_path = try tmp_dir.getAbsPath();
 
     var dir = try Dir.a2(&mem, tmp_dir_path, test_io);
     defer dir.d();
@@ -99,7 +99,7 @@ test "Dir: getCurrentDir" {
     const sub_dir_path2 = try Fs.joinPath(&mem, &[".cache", "sub2"] );
     try my_dir.deleteDirAll(sub_dir_path2);
 
-    const dir_absolute_path = try my_dir.getAbsolutePath();
+    const dir_absolute_path = try my_dir.getAbsPath();
     const sub_dir_path3 = try Fs.joinPath(&mem, &[dir_absolute_path, ".cache", "sub"]);
     try Dir.createDirPath(&mem, sub_dir_path3);
     try Dir.deleteDirPath(&mem, sub_dir_path3);
@@ -112,10 +112,10 @@ test "Dir: copyFile" {
     mem.f();
     defer mem.d();
 
-    var tmp_dir = try Dir.getTempDir(&mem);
+    var tmp_dir = try Dir.getTmpDir(&mem);
     defer tmp_dir.d();
 
-    const tmp_dir_path = try tmp_dir.getAbsolutePath();
+    const tmp_dir_path = try tmp_dir.getAbsPath();
     //Console.print2("dir path2 = {s}\n", .{tmp_dir_path});
 
     const data = "u6wj+JmdF3qHsFPE BUlH2g4gJCmEz0PP";
@@ -146,10 +146,10 @@ test "Dir: iter" {
     mem.f();
     defer mem.d();
 
-    var tmp_dir = try Dir.getTempDir(&mem);
+    var tmp_dir = try Dir.getTmpDir(&mem);
     defer tmp_dir.d();
 
-    const tmp_dir_path = try tmp_dir.getAbsolutePath();
+    const tmp_dir_path = try tmp_dir.getAbsPath();
     //defer mem.free2(tmp_dir_path);
 
     // First, create a couple of entries to iterate over.
@@ -189,8 +189,8 @@ test "File: a readLine" {
     mem.f();
     defer mem.d();
 
-    var tmp_dir = try Dir.getTempDir(&mem);
-    const tmp_dir_path = try tmp_dir.getAbsolutePath();
+    var tmp_dir = try Dir.getTmpDir(&mem);
+    const tmp_dir_path = try tmp_dir.getAbsPath();
     defer {
         tmp_dir.d();
         Dir.deleteAll(&mem, tmp_dir_path) catch {};
@@ -216,8 +216,8 @@ test "File: a2" {
     mem.f();
     defer mem.d();
 
-    var tmp_dir = try Dir.getTempDir(&mem);
-    const tmp_dir_path = try tmp_dir.getAbsolutePath();
+    var tmp_dir = try Dir.getTmpDir(&mem);
+    const tmp_dir_path = try tmp_dir.getAbsPath();
     defer {
         tmp_dir.d();
         Dir.deleteAll(&mem, tmp_dir_path) catch {};
@@ -238,10 +238,10 @@ test "File: read" {
     mem.f();
     defer mem.d();
 
-    var tmp_dir = try Dir.getTempDir(&mem);
+    var tmp_dir = try Dir.getTmpDir(&mem);
     defer tmp_dir.d();
 
-    const tmp_dir_path = try tmp_dir.getAbsolutePath();
+    const tmp_dir_path = try tmp_dir.getAbsPath();
     //defer mem.free2(tmp_dir_path);
 
     const file_path = try Fs.joinPath(&mem, &[tmp_dir_path, "test.txt"]);
@@ -274,10 +274,10 @@ test "File: create a File" {
     mem.f();
     defer mem.d();
 
-    var tmp_dir = try Dir.getTempDir(&mem);
+    var tmp_dir = try Dir.getTmpDir(&mem);
     defer tmp_dir.d();
 
-    const tmp_dir_path = try tmp_dir.getAbsolutePath();
+    const tmp_dir_path = try tmp_dir.getAbsPath();
 
     const file_path = try Fs.joinPath(&mem, &[tmp_dir_path, "test.txt"]);
     var file_w = try File.create(&mem, file_path);

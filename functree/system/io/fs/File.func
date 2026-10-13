@@ -42,7 +42,7 @@ pub fn a2(mem: *Mem, file_path: str, io: std.Io) !File {
         if (file == null) {
             var dir = try Dir.getCurrentDir(mem);
             defer dir.d();
-            const dir_path = try dir.getAbsolutePath();
+            const dir_path = try dir.getAbsPath();
             defer mem.free2(dir_path);
 
             absolute_path = Fs.joinPath(mem, &[dir_path, file_path]) catch unreachable;

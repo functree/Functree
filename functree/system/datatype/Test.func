@@ -977,6 +977,14 @@ test "String: isUtf8Str" {
     try expect(String.isUtf8Str("中文"));
 }
 
+test "String: subStr" {
+    const string: str = "ab中c文";
+    const sub_str = String.subStr(string, 3);
+    Console.print2("sub_str={s}\n", .{sub_str});
+
+    try expect(String.equalStr(sub_str, "ab中"));
+}
+
 test "String: formatStr" {
     // init stack memory
     var buffer: [1024]u8 = undefined;

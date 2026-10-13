@@ -79,7 +79,7 @@ pub fn openDir2(self: *Dir, sub_path: str, options: OpenOptions) OpenDirError!Di
     return Dir{.dir=dir, .mem=self.mem, .io=self.io};
 }
 /// get absolute path of this dir
-pub fn getAbsolutePath(self: Dir) ![]u8 {
+pub fn getAbsPath(self: Dir) ![]u8 {
     var buffer: [1024]u8 = undefined;
     const len = try self.dir.realPath(self.io, &buffer);
     const absolute_path = buffer[0..len];
@@ -133,7 +133,7 @@ pub fn getCurrentDir(mem: *Mem) !Dir {
 }
 code('''
 /// get a temp dir's absolute path
-pub fn getTempDir(mem: *Mem) !Dir {
+pub fn getTmpDir(mem: *Mem) !Dir {
     const io = mem.io();
     const random_dir_name = try getRandName(mem.allocator(), 16);
     const temp_dir_path = try Fs.joinPath(mem, &.{".cache/tmp", random_dir_name});

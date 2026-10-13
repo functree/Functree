@@ -64,6 +64,7 @@ pub fn lastIndexOf(self: String, needle: str) ?usize {
 pub fn equal(self: String, value: String) bool {
     return std.mem.eql(u8, self.bytes, value.bytes);
 }
+/// Compares two String and returns whether they are equal with ignore case.
 pub fn equalIc(self: String, value: String) bool {
     const v1 = self.lower() catch return false;
     const v2 = value.lower() catch return false;
@@ -73,24 +74,6 @@ pub fn count(self: String, needle: str) usize {
     return std.mem.count(u8, self.bytes, needle);
 }
 
-/// Truncate a UTF-8 slice to at most `max_len` bytes without splitting
-/// a multi-byte sequence. Backs up over trailing continuation bytes (0x80..0xBF).
-pub fn subUtf8(self: String, max_len: usize) String {
-    if (self.bytes.len <= max_len) return self.bytes;
-    var end: usize = max_len;
-    while (end > 0 and self.bytes[end] & 0xC0 == 0x80) {
-        end -= 1;
-    }
-    return String{
-        .mem = self.mem,
-        .bytes = self.bytes[0..end],
-    };
-}
-///To UTF-8 Char Array
-pub fn utf8Array(self: String) ![]str {
-    var list = try self.utf8List();
-    return try list.toArray();
-}
 ///To UTF-8 Char List
 pub fn utf8List(self: String) !List.t(str) {
     var list = List.t(str).a(self.mem);
@@ -101,6 +84,21 @@ pub fn utf8List(self: String) !List.t(str) {
         try list.add(try self.mem.allocator().dupe(u8, buffer));
     }
     return list;
+}
+///To UTF-8 Char Array
+pub fn utf8Array(self: String) ![]str {
+    var list = try self.utf8List();
+    return try list.toArray();
+}
+/// Truncate a UTF-8 slice to at most `max_len` bytes without splitting a multi-byte sequence.
+pub fn sub(self: String, max_len: usize) String {
+    return self.sub2(0, max_len);
+}
+pub fn sub2(self: String, start: usize, end: usize) String {
+    return String{
+        .mem = self.mem,
+        .bytes = subStr2(self.bytes, start, end),
+    };
 }
 
 pub fn toStr(self: String) str {
@@ -265,21 +263,6 @@ pub fn isUtf8Str(value: str) bool {
 pub fn utf8Iter(value: str) !Utf8Iterator {
     return (try unicode.Utf8View.init(value)).iterator();
 }
-/// Truncate a UTF-8 slice to at most `max_len` bytes without splitting
-/// a multi-byte sequence. Backs up over trailing continuation bytes (0x80..0xBF).
-pub fn subUtf8Str(value: str, max_len: usize) str {
-    if (value.len <= max_len) return value;
-    var end: usize = max_len;
-    while (end > 0 and value[end] & 0xC0 == 0x80) {
-        end -= 1;
-    }
-    return value[0..end];
-}
-///To UTF-8 Char Array
-pub fn utf8ArrayStr(mem: *Mem, value: str) ![]str {
-    var list = try utf8ListStr(mem, value);
-    return try list.toArray();
-}
 /// get utf8 char List of the given str.
 pub fn utf8ListStr(mem: *Mem, value: str) !List.t(str) {
     var list = List.t(str).a(mem);
@@ -291,12 +274,51 @@ pub fn utf8ListStr(mem: *Mem, value: str) !List.t(str) {
     }
     return list;
 }
+///To UTF-8 Char Array
+pub fn utf8ArrayStr(mem: *Mem, value: str) ![]str {
+    var list = try utf8ListStr(mem, value);
+    return try list.toArray();
+}
+/// Truncate a UTF-8 slice to at most `max_len` bytes without splitting a multi-byte sequence.
+pub fn subStr(value: str, max_len: usize) str {
+    return subStr2(value, 0, max_len);
+}
+/// Truncate a UTF-8 slice from start to end without splitting a multi-byte sequence. start must less than end.
+pub fn subStr2(value: str, start: usize, end: usize) str {
+    if (end == 0) return value[0..0]; // 直接返回空切片
+    if (start >= end) return value[0..0];
+
+    // 使用 Utf8View 迭代码点（假设输入是有效的 UTF-8）
+    var view = std.unicode.Utf8View.initUnchecked(value);
+    var iter = view.iterator();
+
+    var byte_start: ?usize = null;
+    var byte_end: usize = value.len;
+    var char_index: usize = 0;
+    var current_byte: usize = 0;
+
+    while (iter.nextCodepointSlice()) |cp| {
+        if (char_index == start) {
+            byte_start = current_byte;
+        }
+        if (char_index == end) {
+            byte_end = current_byte;
+            break;
+        }
+        current_byte += cp.len;
+        char_index += 1;
+    }
+
+    // 起始位置超出总字符数
+    if (byte_start == null) {
+        return value[value.len..value.len]; // 返回空切片
+    }
+
+    return value[byte_start.?..byte_end];
+}
 
 pub fn copyStr(mem: *Mem, value: str) ![]u8 {
     return try mem.allocator().dupe(u8, value);
-}
-pub fn copySubStr(mem: *Mem, value: str, start: usize, end: usize) !str {
-    return try mem.allocator().dupe(u8, value[start..end]);
 }
 
 pub fn concatStr(mem: *Mem, slices: []str) ![]u8 {
@@ -347,9 +369,11 @@ pub fn countStr(value: str, needle: str) usize {
     return std.mem.count(u8, value, needle);
 }
 
+/// Compares two str and returns whether they are equal.
 pub fn equalStr(value1: str, value2: str) bool {
     return std.mem.eql(u8, value1, value2);
 }
+/// Compares two str and returns whether they are equal with ignore case.
 pub fn equalIcStr(value1: str, value2: str) bool {
     // a Heap
     var mem = Mem.a();
