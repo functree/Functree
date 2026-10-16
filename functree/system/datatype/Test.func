@@ -485,26 +485,26 @@ test "Integer: minValue maxValue" {
 
 
 const Json = DataType.Json;
-const JsonObject = Json.JsonObject;
-const JsonArray = Json.JsonArray;
+const JsonMap = Json.JsonMap;
+const JsonList = Json.JsonList;
 pub const JsonValue = Json.JsonValue;
-test "Json: a JsonObject" {
+test "Json: a JsonMap" {
     // init heap memory
     var mem = Mem.a();
     mem.f();
     defer mem.d();
 
-    var object = JsonObject.a(&mem);
-    try object.add("string", "abc");
-    try object.add("integer", 23);
+    var map = JsonMap.a(&mem);
+    try map.add("string", "abc");
+    try map.add("integer", 23);
     const large_number: u64 = 18446744073709551615;
-    try object.add("number_string", large_number);
+    try map.add("number_string", large_number);
 
-    const actual = try object.toStr();
+    const actual = try map.toStr();
     const expected = "{\"string\":\"abc\",\"integer\":23,\"number_string\":18446744073709551615}";
     try expectEqualStrings(expected, actual);
 }
-test "Json: JsonObject parse str" {
+test "Json: JsonMap parse str" {
     const json_str =
         '''
         {
@@ -532,70 +532,70 @@ test "Json: JsonObject parse str" {
     mem.f();
     defer mem.d();
 
-    const json_object = try JsonObject.parse(&mem, json_str);
+    const json_map = try JsonMap.parse(&mem, json_str);
 
-    const image = json_object.getJsonObject("Image").?;
+    const image_map = json_map.getJsonMap("Image").?;
 
-    try expect(image.getInteger("Width").? == 800);
+    try expect(image_map.getInteger("Width").? == 800);
 
-    try expect(image.get("File").?.null == {});
+    try expect(image_map.get("File").?.null == {});
 
-    try expect(image.getBool("Animated").? == false);
+    try expect(image_map.getBool("Animated").? == false);
 
-    const ids = image.getJsonArray("IDs").?;
+    const ids = image_map.getJsonList("IDs").?;
     try expect(ids.values()[1].integer == 943);
 
-    const array_of_object = image.getJsonArray("ArrayOfObject").?;
-    try expect(String.equalStr(array_of_object.values()[0].object.get("n").?.string, "m"));
+    const list_of_map = image_map.getJsonList("ArrayOfObject").?;
+    try expect(String.equalStr(list_of_map.values()[0].object.get("n").?.string, "m"));
 
-    const double = image.getFloat("double").?;
+    const double = image_map.getFloat("double").?;
     try expect(double == 1.3412);
 
-    const large_int_str = image.getNumberString("LargeInt").?;
+    const large_int_str = image_map.getNumberString("LargeInt").?;
     try expect(String.equalStr(large_int_str, "18446744073709551615"));
 }
-test "Json: a JsonArray" {
+test "Json: a JsonList" {
     // init heap memory
     var mem = Mem.a();
     // auto free memory by arena
     mem.f();
     defer mem.d();
 
-    var object = JsonObject.a(&mem);
-    try object.add("a", "b");
+    var map = JsonMap.a(&mem);
+    try map.add("a", "b");
 
-    var array = Json.JsonArray.a(&mem);
-    try array.add(1);
-    try array.add(2);
+    var list = Json.JsonList.a(&mem);
+    try list.add(1);
+    try list.add(2);
     const i: i32 = 3;
-    try array.add(i);
-    try array.add(null);
+    try list.add(i);
+    try list.add(null);
 
-    var array_parent = Json.JsonArray.a(&mem);
-    try array_parent.add(true);
-    try array_parent.add(42);
-    try array_parent.add(4300000000000000);
-    try array_parent.add(4.2);
-    try array_parent.add("weeee");
-    try array_parent.add(array);
-    try array_parent.add(object);
+    var list_parent = Json.JsonList.a(&mem);
+    try list_parent.add(true);
+    try list_parent.add(42);
+    try list_parent.add(4300000000000000);
+    try list_parent.add(4.2);
+    try list_parent.add("weeee");
+    try list_parent.add(list);
+    try list_parent.add(map);
 
-    const actual = try array_parent.toStr();
+    const actual = try list_parent.toStr();
     const expected = "[true,42,4300000000000000,4.2,\"weeee\",[1,2,3,null],{\"a\":\"b\"}]";
     try expectEqualStrings(expected, actual);
 }
-test "Json: JsonArray parse str" {
+test "Json: JsonList parse str" {
     // init heap memory
     var mem = Mem.a();
     mem.f();
     defer mem.d();
 
     const ids = "[116, 943, 234, 38793]";
-    const array_ids = try JsonArray.parse(&mem, ids);
+    const array_ids = try JsonList.parse(&mem, ids);
     try expect(array_ids.values()[1].integer == 943);
 
     const objects = "[{\"n\": \"m\"}]";
-    const array_objects = try JsonArray.parse(&mem, objects);
+    const array_objects = try JsonList.parse(&mem, objects);
     try expect(String.equalStr(array_objects.values()[0].object.get("n").?.string, "m"));
 }
 
@@ -640,8 +640,8 @@ test "Json: parse" {
     const ids = image.object.get("IDs").?;
     try expect(ids.array.items[1].integer == 943);
 
-    const array_of_object = image.object.get("ArrayOfObject").?;
-    try expect(String.equalStr(array_of_object.array.items[0].object.get("n").?.string, "m"));
+    const list_of_map = image.object.get("ArrayOfObject").?;
+    try expect(String.equalStr(list_of_map.array.items[0].object.get("n").?.string, "m"));
 
     const double = image.object.get("double").?;
     try expect(double.float == 1.3412);
@@ -652,12 +652,12 @@ test "Json: parse" {
 test "Json: toStr" {
     var buffer: [10000]u8 = undefined;
 
-    //JsonObject
+    //JsonMap
     const actual = try Json.toStr(&buffer, .{ .foo = "bar", .answer = 42, .my_friend = "sammy" });
     const expected = "{\"foo\":\"bar\",\"answer\":42,\"my_friend\":\"sammy\"}";
     try expectEqualStrings(expected, actual);
 
-    //JsonArray
+    //JsonList
     const Func = func {
         foo: u32,
     };

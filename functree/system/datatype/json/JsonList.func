@@ -13,55 +13,55 @@ const Array = std.json.Array;
 mem: *Mem,
 array: Array, // Array's item is JsonValue
 
-pub fn a(mem: *Mem) JsonArray {
-    return JsonArray{
+pub fn a(mem: *Mem) JsonList {
+    return JsonList{
         .mem = mem,
         .array = Array.init(mem.allocator()),
     };
 }
-pub fn a2(mem: *Mem, array: Array) JsonArray {
-    return JsonArray{
+pub fn a2(mem: *Mem, array: Array) JsonList {
+    return JsonList{
         .mem = mem,
         .array = array,
     };
 }
-pub fn parse(mem: *Mem, json_str: []const u8) !JsonArray {
+pub fn parse(mem: *Mem, json_str: []const u8) !JsonList {
     const parsed = try std.json.parseFromSlice(JsonValue, mem.allocator(), json_str, .{});
-    return JsonArray{
+    return JsonList{
         .mem = mem,
         .array = parsed.value.array,
     };
 }
-pub fn d(self: *JsonArray) void {
+pub fn d(self: *JsonList) void {
     self.array.deinit();
 }
 
-pub fn values(self: JsonArray) []JsonValue {
+pub fn values(self: JsonList) []JsonValue {
     return self.array.items;
 }
-pub fn count(self: JsonArray) usize {
+pub fn count(self: JsonList) usize {
     return self.array.items.len;
 }
-pub fn add(self: *JsonArray, value: anytype) !void {
+pub fn add(self: *JsonList, value: anytype) !void {
     const json_value = try Json.getJsonValue(self.mem, value);
     try self.array.append(json_value.*);
 }
-pub fn add2(self: *JsonArray, i: usize, value: anytype) !void {
+pub fn add2(self: *JsonList, i: usize, value: anytype) !void {
     const json_value = try Json.getJsonValue(self.mem, value);
     try self.array.insert(i, json_value.*);
 }
-pub fn addArray(self: *JsonArray, slice: []const JsonValue) !void {
+pub fn addArray(self: *JsonList, slice: []const JsonValue) !void {
     try self.array.appendSlice(slice);
 }
-pub fn addArray2(self: *JsonArray, i: usize, slice: []const JsonValue) !void {
+pub fn addArray2(self: *JsonList, i: usize, slice: []const JsonValue) !void {
     try self.array.insertSlice(i, slice);
 }
-pub fn toArray(self: *JsonArray) ![]JsonValue {
+pub fn toArray(self: *JsonList) ![]JsonValue {
     return try self.array.toOwnedSlice();
 }
 '''
 );
-pub fn toStr(self: JsonArray) ![]u8 {
+pub fn toStr(self: JsonList) ![]u8 {
     const json_value: JsonValue = .{.array = self.array};
     const total_size: usize = 1024000;
     const buffer = try self.mem.alloc2(u8, total_size);
