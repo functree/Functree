@@ -11,6 +11,7 @@ const std = @import("std");
 const Array = std.json.Array;
 
 mem: *Mem,
+parsed: ?std.json.Parsed(JsonValue) = null,
 array: Array, // Array's item is JsonValue
 
 pub fn a(mem: *Mem) JsonList {
@@ -29,11 +30,22 @@ pub fn parse(mem: *Mem, json_str: []const u8) !JsonList {
     const parsed = try std.json.parseFromSlice(JsonValue, mem.allocator(), json_str, .{});
     return JsonList{
         .mem = mem,
+        .parsed = parsed,
         .array = parsed.value.array,
     };
 }
 pub fn d(self: *JsonList) void {
-    self.array.deinit();
+    for (self.array.items) |val| {
+        if (val == .number_string) {
+            self.mem.free2(val.number_string);
+        }
+    }
+    if (self.parsed != null) {
+        self.parsed.?.deinit();
+    } else {
+        self.array.deinit();
+    }
+    self.* = undefined;
 }
 
 pub fn values(self: JsonList) []JsonValue {
@@ -44,10 +56,12 @@ pub fn count(self: JsonList) usize {
 }
 pub fn add(self: *JsonList, value: anytype) !void {
     const json_value = try Json.getJsonValue(self.mem, value);
+    defer self.mem.free(json_value);
     try self.array.append(json_value.*);
 }
 pub fn add2(self: *JsonList, i: usize, value: anytype) !void {
     const json_value = try Json.getJsonValue(self.mem, value);
+    defer self.mem.free(json_value);
     try self.array.insert(i, json_value.*);
 }
 pub fn addArray(self: *JsonList, slice: []const JsonValue) !void {
@@ -64,6 +78,7 @@ pub fn toArray(self: *JsonList) ![]JsonValue {
 pub fn toStr(self: JsonList) ![]u8 {
     const json_value: JsonValue = .{.array = self.array};
     const total_size: usize = 1024000;
-    const buffer = try self.mem.alloc2(u8, total_size);
-    return try Json.toStr(buffer, json_value);
+    var buffer: [total_size]u8 = undefined;
+    const result = try Json.toStr(&buffer, json_value);
+    return try self.mem.allocator().dupe(u8, result);
 }

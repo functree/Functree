@@ -18,7 +18,7 @@ const Console = Io.Console;
 test "Console: a" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var console = Console.a(&mem);
@@ -26,11 +26,13 @@ test "Console: a" {
 
     try console.output("you: ");
     const input_str = try console.input('\n');
+    defer mem.free2(input_str);
     try console.output(input_str);
     try console.output("\n");
 
     try console.output("you: ");
     const input_str2 = try console.input('\n');
+    defer mem.free2(input_str2);
     try console.output(input_str2);
     try console.output("\n");
 }
@@ -46,12 +48,13 @@ test "Dir: a" {
     // init heap memory
     var mem = Mem.a();
     // set auto free memory
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var tmp_dir = try Dir.getTmpDir(&mem);
     defer tmp_dir.d();
     const tmp_dir_path = try tmp_dir.getAbsPath();
+    defer mem.free2(tmp_dir_path);
 
     var dir = try Dir.a(&mem, tmp_dir_path);
     defer dir.d();
@@ -59,6 +62,7 @@ test "Dir: a" {
     const sub_paths:[]str = [ "", ".", ".." ];
     for (sub_paths) |sub_path| {
         const dir_path = try Fs.joinPath(&mem, &[tmp_dir_path, sub_path]);
+        defer mem.free2(dir_path);
         var dir2 = try dir.openDir(dir_path);
         defer dir2.d();
     }
@@ -68,12 +72,13 @@ test "Dir: a2" {
     // init heap memory
     var mem = Mem.a();
     // set auto free memory
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var tmp_dir = try Dir.getTmpDir(&mem);
     defer tmp_dir.d();
     const tmp_dir_path = try tmp_dir.getAbsPath();
+    defer mem.free2(tmp_dir_path);
 
     var dir = try Dir.a2(&mem, tmp_dir_path, test_io);
     defer dir.d();
@@ -81,6 +86,7 @@ test "Dir: a2" {
     const sub_paths:[]str = [ "", ".", ".." ];
     for (sub_paths) |sub_path| {
         const dir_path = try Fs.joinPath(&mem, &[tmp_dir_path, sub_path]);
+        defer mem.free2(dir_path);
         var dir2 = try dir.openDir(dir_path);
         defer dir2.d();
     }
@@ -88,19 +94,28 @@ test "Dir: a2" {
 }
 
 test "Dir: getCurrentDir" {
-    var buffer: [1024]u8 = undefined;
-    var mem = Mem.as(&buffer);
+    // var buffer: [1024]u8 = undefined;
+    // var mem = Mem.as(&buffer);
+    // init heap memory
+    var mem = Mem.a();
+    // set auto free memory
+    //mem.f();
+    defer mem.d();
 
     var my_dir = try Dir.getCurrentDir(&mem);
     defer my_dir.d();
 
     const sub_dir_path = try Fs.joinPath(&mem, &[".cache", "sub2", "test"]);
+    defer mem.free2(sub_dir_path);
     try my_dir.createDir(sub_dir_path);
     const sub_dir_path2 = try Fs.joinPath(&mem, &[".cache", "sub2"] );
+    defer mem.free2(sub_dir_path2);
     try my_dir.deleteDirAll(sub_dir_path2);
 
     const dir_absolute_path = try my_dir.getAbsPath();
+    defer mem.free2(dir_absolute_path);
     const sub_dir_path3 = try Fs.joinPath(&mem, &[dir_absolute_path, ".cache", "sub"]);
+    defer mem.free2(sub_dir_path3);
     try Dir.createDirPath(&mem, sub_dir_path3);
     try Dir.deleteDirPath(&mem, sub_dir_path3);
 }
@@ -109,13 +124,14 @@ test "Dir: copyFile" {
     // init heap memory
     var mem = Mem.a();
     // set auto free memory
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var tmp_dir = try Dir.getTmpDir(&mem);
     defer tmp_dir.d();
 
     const tmp_dir_path = try tmp_dir.getAbsPath();
+    defer mem.free2(tmp_dir_path);
     //Console.print2("dir path2 = {s}\n", .{tmp_dir_path});
 
     const data = "u6wj+JmdF3qHsFPE BUlH2g4gJCmEz0PP";
@@ -129,11 +145,14 @@ test "Dir: copyFile" {
     defer tmp_dir.deleteFile(src_file) catch {};
 
     const src_file_absolute = try Fs.joinPath(&mem, &[tmp_dir_path, src_file]);
+    defer mem.free2(src_file_absolute);
     const dest_file_absolute = try Fs.joinPath(&mem, &[tmp_dir_path, dest_file]);
+    defer mem.free2(dest_file_absolute);
     try Dir.copyFile(&mem, src_file_absolute, dest_file_absolute);
     defer tmp_dir.deleteFile(dest_file) catch {};
 
     const dest_file_absolute2 = try Fs.joinPath(&mem, &[tmp_dir_path, dest_file2]);
+    defer mem.free2(dest_file_absolute2);
     try Dir.copyFile(&mem, src_file_absolute, dest_file_absolute2);
     defer tmp_dir.deleteFile(dest_file2) catch {};
 
@@ -143,14 +162,14 @@ test "Dir: copyFile" {
 test "Dir: iter" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var tmp_dir = try Dir.getTmpDir(&mem);
     defer tmp_dir.d();
 
     const tmp_dir_path = try tmp_dir.getAbsPath();
-    //defer mem.free2(tmp_dir_path);
+    defer mem.free2(tmp_dir_path);
 
     // First, create a couple of entries to iterate over.
     const src_file = "some_file";
@@ -159,7 +178,9 @@ test "Dir: iter" {
     defer file.d();
 
     const src_file_path = try Fs.joinPath(&mem, &[tmp_dir_path, src_file]);
+    defer mem.free2(src_file_path);
     const dest_file_path = try Fs.joinPath(&mem, &[tmp_dir_path, dest_file]);
+    defer mem.free2(dest_file_path);
     try Dir.renamePath(&mem, src_file_path, dest_file_path);
 
     try tmp_dir.createDir("some_dir");
@@ -182,72 +203,72 @@ test "Dir: iter" {
 
 
 const File = Fs.File;
-test "File: a readLine" {
+test "File: a nextLine" {
     // init heap memory
     var mem = Mem.a();
     // set auto free memory
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var tmp_dir = try Dir.getTmpDir(&mem);
+    defer tmp_dir.d();
     const tmp_dir_path = try tmp_dir.getAbsPath();
-    defer {
-        tmp_dir.d();
-        Dir.deleteAll(&mem, tmp_dir_path) catch {};
-    }
+    defer mem.free2(tmp_dir_path);
 
     const file_path = try Fs.joinPath(&mem, &[tmp_dir_path, "test.txt"]);
+    defer mem.free2(file_path);
     var file = try File.a(&mem, file_path);
     defer file.d();
     _ = try file.append("abcde\n");
     const info = try file.stat();
 
-    // read lines
-    while (try file.readLine()) |line| {
-        Console.print2("file.readLine()={s}\n", .{line});
+    // read next line
+    while (try file.nextLine()) |line| {
+        Console.print2("file.nextLine()={s}\n", .{line});
     }
 
     try expect(info.size == 6);
+    Dir.deleteAll(&mem, tmp_dir_path) catch {};
 }
 test "File: a2" {
     // init heap memory
     var mem = Mem.a();
     // set auto free memory
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var tmp_dir = try Dir.getTmpDir(&mem);
+    defer tmp_dir.d();
     const tmp_dir_path = try tmp_dir.getAbsPath();
-    defer {
-        tmp_dir.d();
-        Dir.deleteAll(&mem, tmp_dir_path) catch {};
-    }
+    defer mem.free2(tmp_dir_path);
 
     const file_path = try Fs.joinPath(&mem, &[tmp_dir_path, "test.txt"]);
+    defer mem.free2(file_path);
     var file = try File.a2(&mem, file_path, test_io);
     defer file.d();
     _ = try file.append("abcde\n");
     const info = try file.stat();
 
     try expect(info.size == 6);
+    Dir.deleteAll(&mem, tmp_dir_path) catch {};
 }
 
 test "File: read" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var tmp_dir = try Dir.getTmpDir(&mem);
     defer tmp_dir.d();
 
     const tmp_dir_path = try tmp_dir.getAbsPath();
-    //defer mem.free2(tmp_dir_path);
+    defer mem.free2(tmp_dir_path);
 
     const file_path = try Fs.joinPath(&mem, &[tmp_dir_path, "test.txt"]);
+    defer mem.free2(file_path);
     var file = try File.a(&mem, file_path);
     defer file.d();
-    //defer mem.free2(file_path);
 
     _ = try file.append("abcde");
 
@@ -271,24 +292,27 @@ test "File: create a File" {
     // init heap memory
     var mem = Mem.a();
     // set auto free memory
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var tmp_dir = try Dir.getTmpDir(&mem);
     defer tmp_dir.d();
 
     const tmp_dir_path = try tmp_dir.getAbsPath();
+    defer mem.free2(tmp_dir_path);
 
     const file_path = try Fs.joinPath(&mem, &[tmp_dir_path, "test.txt"]);
+    defer mem.free2(file_path);
     var file_w = try File.create(&mem, file_path);
     defer file_w.d();
     _ = try file_w.append("123中文");
 
     var file_r = try File.a(&mem, file_path);
     defer file_r.d();
-    const buffer = try file_r.readAll();
+    const content = try file_r.readAll();
+    defer mem.free2(content);
 
-    try expect(String.equalStr(buffer, "123中文"));
+    try expect(String.equalStr(content, "123中文"));
 
     Dir.deleteAll(&mem, tmp_dir_path) catch {};
 }
@@ -297,7 +321,7 @@ const Net = Io.Net;
 fn clientFn(server_address: Net.IpAddress) !void {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var client = try Net.TcpClient.a(&mem, server_address);
@@ -308,6 +332,7 @@ fn clientFn(server_address: Net.IpAddress) !void {
 
     // 接收服务器回应的消息
     const result = try client.receive();
+    defer mem.free2(result);
     try expectEqualSlices(u8, "Hello from server!", result);
 }
 test "TcpServer: a tcp server" {
@@ -316,7 +341,7 @@ test "TcpServer: a tcp server" {
 
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     // 创建服务器
@@ -335,6 +360,7 @@ test "TcpServer: a tcp server" {
 
         // 获取客户端消息
         const result = try tcp_server.receive();
+        defer mem.free2(result);
         try expectEqualSlices(u8, "Hello from client!", result);
 
         // 服务器给客户端回应消息
@@ -344,21 +370,24 @@ test "TcpServer: a tcp server" {
     }
 }
 
-test "HttpClient: get" {
+const HttpClient = Io.Net.HttpClient;
+test "HttpClient: getUrl" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
-    const text = try Net.HttpClient.get(&mem, "http://192.168.1.1/html/index.html#/redirect");
+    const text = try Net.HttpClient.getUrl(&mem, "http://192.168.1.1/html/index.html#/redirect");
+    defer mem.free2(text);
     Console.print2("{s}\n", .{text});
 }
-test "HttpClient: post" {
+test "HttpClient: postUrl" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
-    const text = try Net.HttpClient.post(&mem, "http://192.168.1.1/html/index.html#/redirect", "");
+    const text = try Net.HttpClient.postUrl(&mem, "http://192.168.1.1/html/index.html#/redirect", "");
+    defer mem.free2(text);
     Console.print2("{s}\n", .{text});
 }

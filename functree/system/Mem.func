@@ -16,6 +16,8 @@ pub const Heap = std.heap.SafeAllocator;
 const FallbackAllocator = import("mem/FallbackAllocator.func");
 const Io = import("Io.func");
 
+my_allocator: ?Allocator = null,
+
 heap: ?Heap = null,
 heap_arena: ?HeapArena = null,
 stack: ?Stack = null,
@@ -25,6 +27,7 @@ is_stack: bool = false,
 auto_free: bool = false,
 
 threaded: ?std.Io.Threaded = null,
+default_io: ?std.Io = null,
 
 /// init a heap, must manually free the memory by 'd()' method
 pub fn a() Mem {
@@ -32,6 +35,24 @@ pub fn a() Mem {
         .heap = .init(std.heap.page_allocator, .{}),
     };
 }
+// pub fn a1(gpa: std.mem.Allocator) Mem {
+//     return Mem{
+//         .heap = .init(gpa, .{}),
+//     };
+// }
+// pub fn a2(gpa: std.mem.Allocator, heap_arena: HeapArena) Mem {
+//     return Mem{
+//         .heap = .init(gpa, .{}),
+//         .heap_arena = heap_arena,
+//     };
+// }
+// pub fn a3(gpa: std.mem.Allocator, heap_arena: HeapArena, default_io: std.Io) Mem {
+//     return Mem{
+//         .heap = .init(gpa, .{}),
+//         .heap_arena = heap_arena,
+//         .default_io = default_io,
+//     };
+// }
 
 /// init a HeapArena，will auto free the memory by 'd()' method 
 /// must call 'a()' first, then 'f()', finally 'd()'
@@ -111,19 +132,22 @@ pub fn isStack(self: Mem) bool {
 
 ///get allocator
 pub fn allocator(self: *Mem) Allocator {
-    if (self.stack != null) {
-        if (self.single_thread) {
-            return self.stack.?.allocator();
+    if (self.my_allocator == null) {
+        if (self.stack != null) {
+            if (self.single_thread) {
+                self.my_allocator = self.stack.?.allocator();
+            } else {
+                self.my_allocator = self.stack.?.threadSafeAllocator();
+            }
+        } else if (self.stack_heap != null) {
+            self.my_allocator = self.stack_heap.?.get();
+        } else if (self.heap_arena != null) {
+            self.my_allocator = self.heap_arena.?.allocator();
         } else {
-            return self.stack.?.threadSafeAllocator();
+            self.my_allocator = self.heap.?.allocator();
         }
-    } else if (self.stack_heap != null) {
-        return self.stack_heap.?.get();
-    } else if (self.heap_arena != null) {
-        return self.heap_arena.?.allocator();
-    } else {
-        return self.heap.?.allocator();
     }
+    return self.my_allocator.?;
 }
 
 
@@ -152,10 +176,17 @@ pub fn free2(self: *Mem, array: anytype) void {
 }
 
 pub fn io(self: *Mem) Io.StdIo {
-    if (self.threaded == null) {
-        self.threaded = .init(self.allocator(), .{});
+    if (self.default_io) |my_io| {
+        return my_io;
+    } else {
+        if (self.threaded == null) {
+            self.threaded = .init(self.allocator(), .{});
+        }
+        return self.threaded.?.io();
     }
-    return self.threaded.?.io();
+}
+pub fn setIo(self: *Mem, default_io: Io.StdIo) void {
+    self.default_io = default_io;
 }
 
 
@@ -173,12 +204,15 @@ pub fn copyRange(dest: anytype, source: anytype, from: u32, to: u32) void {
     '''
     );
 }
+// pub fn fill(array: anytype, value: anytype) void {
+//     var index: u32 = 0;
+//     while (index < array.len) {
+//         array[index] = value;
+//         index += 1;
+//     }
+// }
 pub fn fill(array: anytype, value: anytype) void {
-    var index: u32 = 0;
-    while (index < array.len) {
-        array[index] = value;
-        index += 1;
-    }
+    code('''@memset(array, value);''');
 }
 
 pub fn sortAsc(comptime T: type, items: []T) void {

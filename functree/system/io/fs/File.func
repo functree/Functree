@@ -57,6 +57,9 @@ pub fn a2(mem: *Mem, file_path: str, io: std.Io) !File {
 /// deinit a File
 pub fn d(self: *File) void {
     self.file.close(self.io);
+    if (self.reader != null) {
+        self.mem.free2(self.reader.?.interface.buffer);
+    }
     self.* = undefined;
 }
 
@@ -74,8 +77,8 @@ pub fn read(self: *File, buffer: []u8) !usize {
     }
     return try self.reader.?.interface.readSliceShort(buffer);
 }
-/// read lines from this file
-pub fn readLine(self: *File) !?[]u8 {
+/// read next line from this file, return null at end of the file
+pub fn nextLine(self: *File) !?[]u8 {
     if (self.reader == null) {
         const file_len = try self.len();
         if (file_len == 0) return null;

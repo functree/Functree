@@ -1,0 +1,38 @@
+const Mem = import("../../Mem.func");
+
+code(
+'''
+const std = @import("std");
+
+mem: *Mem,
+mutex: std.Io.Mutex,
+io: std.Io,
+
+/// init a Mutex
+pub fn a(mem: *Mem) Mutex {
+   const io = mem.io();
+   const mutex: std.Io.Mutex = .init;
+   return .{.mem=mem, .mutex=mutex, .io=io};
+}
+pub fn a2(mem: *Mem, io: std.Io) Mutex {
+    const mutex: std.Io.Mutex = .init;
+    return .{.mem=mem, .mutex=mutex, .io=io};
+}
+/// deinit a Mutex
+pub fn d(self: *Mutex) void {
+    self.* = undefined;
+}
+
+pub fn tryLock(self: *Mutex) bool {
+    return self.mutex.tryLock();
+}
+
+pub fn lock(self: *Mutex) void {
+    self.mutex.lockUncancelable(self.io);
+}
+
+pub fn unlock(self: *Mutex) void {
+    self.mutex.unlock(self.io);
+}
+'''
+);

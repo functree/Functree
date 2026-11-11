@@ -1,0 +1,7 @@
+code(
+'''
+const std = @import("std");
+
+pub const a = std.log.scoped;
+'''
+);

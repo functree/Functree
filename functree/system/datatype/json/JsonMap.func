@@ -3,13 +3,14 @@ const Json = import("../Json.func");
 const JsonValue = Json.JsonValue;
 const JsonList = Json.JsonList;
 
+const ObjectMap = std.json.ObjectMap;
+
 code(
 '''
 const std = @import("std");
+parsed: ?std.json.Parsed(JsonValue) = null,
 '''
 );
-
-const ObjectMap = std.json.ObjectMap;
 
 mem: *Mem,
 object: ObjectMap, // Map's value is JsonValue
@@ -31,11 +32,22 @@ pub fn parse(mem: *Mem, json_str: str) !JsonMap {
     const parsed = try std.json.parseFromSlice(JsonValue, mem.allocator(), json_str, .{});
     return JsonMap{
         .mem = mem,
-        .object = parsed.value.object
+        .parsed = parsed,
+        .object = parsed.value.object,
     };
 }
 pub fn d(self: *JsonMap) void {
-    self.object.deinit(self.mem.allocator());
+    for (self.object.values()) |val| {
+        if (val == .number_string) {
+            self.mem.free2(val.number_string);
+        }
+    }
+    if (self.parsed != null) {
+        self.parsed.?.deinit();
+    } else {
+        self.object.deinit(self.mem.allocator());
+    }
+    self.* = undefined;
 }
 
 /// Return the number of items in the map.
@@ -102,6 +114,7 @@ pub fn getJsonMap(self: JsonMap, key: str) ?JsonMap {
 
 pub fn add(self: *JsonMap, key: str, value: anytype) !void {
     const json_value = try Json.getJsonValue(self.mem, value);
+    defer self.mem.free(json_value);
     return try self.object.put(self.mem.allocator(), key, json_value.*);
 }
 pub fn addStr(self: *JsonMap, key: str, valueStr: str) !void {
@@ -136,6 +149,9 @@ pub fn addJsonMap(self: *JsonMap, key: str, valueObject: JsonMap) !void {
 pub fn remove(self: *JsonMap, key: str) bool {
     return self.object.swapRemove(key);
 }
+pub fn clear(self: *JsonMap) bool {
+    return self.object.clearRetainingCapacity();
+}
 pub fn keys(self: JsonMap) ![]str {
     return self.object.keys();
 }
@@ -145,6 +161,7 @@ pub fn values(self: JsonMap) ![]JsonValue {
 pub fn toStr(self: JsonMap) ![]u8 {
     const json_value: JsonValue = .{.object = self.object};
     const total_size: usize = 1024000;
-    const buffer = try self.mem.alloc2(u8, total_size);
-    return try Json.toStr(buffer, json_value);
+    var buffer: [total_size]u8 = undefined;
+    const result = try Json.toStr(&buffer, json_value);
+    return try self.mem.allocator().dupe(u8, result);
 }

@@ -16,11 +16,11 @@ const ThreadContext = import("test/ThreadContext.func");
 test "Thread: setName, getName" {
     if (Config.single_thread) return error.SkipZigTest;
 
-    var buffer: [10]u8 = undefined;
+    //var buffer: [10]u8 = undefined;
     // var mem = Mem.as(&buffer);// init Stack memory
     var mem = Mem.a();
     // init StackFallbackHeap memory
-    mem.s(&buffer);
+    //mem.s(&buffer);
     defer mem.d();
 
     var context = ThreadContext{};
@@ -46,7 +46,7 @@ test "Thread: sync" {
 
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var threads: [5]Thread = undefined;
@@ -67,8 +67,12 @@ test "Thread: async" {
     if (Config.single_thread) return error.SkipZigTest;
 
     // init stack memory
-    var buffer: [1024]u8 = undefined;
-    var mem = Mem.as(&buffer);
+    // var buffer: [1024]u8 = undefined;
+    // var mem = Mem.as(&buffer);
+    // defer mem.d();
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
     defer mem.d();
 
     const io = test_io;
@@ -94,7 +98,7 @@ test "Group: a" {
 
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     // 创建一个并发组

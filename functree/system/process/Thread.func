@@ -1,5 +1,7 @@
 pub const AtomicValue = import("thread/AtomicValue.func");
 pub const Group = import("thread/Group.func");
+pub const Mutex = import("thread/Mutex.func");
+pub const Condition = import("thread/Condition.func");
 
 const Mem = import("../Mem.func");
 const String = import("../datatype/String.func");
@@ -47,10 +49,12 @@ pub fn getName(self: Thread) !?str {
 }
 
 /// Waits for the thread to complete, then deallocates any resources created on `a()`.
+/// Once called, this consumes the Thread object and invoking any other functions on it is considered undefined behavior.
 pub fn sync(self: Thread) void {
     self.thread.join();
 }
-/// Release the obligation of the caller to call `join()` and have the thread clean up its own resources on completion
+/// Release the obligation of the caller to call `join()` and have the thread clean up its own resources on completion.
+/// Once called, this consumes the Thread object and invoking any other functions on it is considered undefined behavior.
 pub fn async(self: Thread) void {
     self.thread.detach();
 }

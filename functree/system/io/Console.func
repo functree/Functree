@@ -194,6 +194,9 @@ pub fn setWindowsConsoleUtf8() void {
         _ = windows.SetConsoleOutputCP(65001); // 输出代码页
     }
 }
+pub fn compileError(msg: []const u8) void {
+    @compileError(msg);
+}
 ''');
 
 pub fn output(self: *Console, message: str) !void {

@@ -491,16 +491,18 @@ pub const JsonValue = Json.JsonValue;
 test "Json: a JsonMap" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var map = JsonMap.a(&mem);
+    defer map.d();
     try map.add("string", "abc");
     try map.add("integer", 23);
     const large_number: u64 = 18446744073709551615;
     try map.add("number_string", large_number);
 
     const actual = try map.toStr();
+    defer mem.free2(actual);
     const expected = "{\"string\":\"abc\",\"integer\":23,\"number_string\":18446744073709551615}";
     try expectEqualStrings(expected, actual);
 }
@@ -528,11 +530,12 @@ test "Json: JsonMap parse str" {
         '''
     ;
     // init heap memory
-     var mem = Mem.a();
-    mem.f();
+    var mem = Mem.a();
+    //mem.f();
     defer mem.d();
 
-    const json_map = try JsonMap.parse(&mem, json_str);
+    var json_map = try JsonMap.parse(&mem, json_str);
+    defer json_map.d();
 
     const image_map = json_map.getJsonMap("Image").?;
 
@@ -558,13 +561,15 @@ test "Json: a JsonList" {
     // init heap memory
     var mem = Mem.a();
     // auto free memory by arena
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var map = JsonMap.a(&mem);
+    defer map.d();
     try map.add("a", "b");
 
     var list = Json.JsonList.a(&mem);
+    defer list.d();
     try list.add(1);
     try list.add(2);
     const i: i32 = 3;
@@ -572,6 +577,7 @@ test "Json: a JsonList" {
     try list.add(null);
 
     var list_parent = Json.JsonList.a(&mem);
+    defer list_parent.d();
     try list_parent.add(true);
     try list_parent.add(42);
     try list_parent.add(4300000000000000);
@@ -581,74 +587,27 @@ test "Json: a JsonList" {
     try list_parent.add(map);
 
     const actual = try list_parent.toStr();
+    defer mem.free2(actual);
     const expected = "[true,42,4300000000000000,4.2,\"weeee\",[1,2,3,null],{\"a\":\"b\"}]";
     try expectEqualStrings(expected, actual);
 }
 test "Json: JsonList parse str" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     const ids = "[116, 943, 234, 38793]";
-    const array_ids = try JsonList.parse(&mem, ids);
+    var array_ids = try JsonList.parse(&mem, ids);
+    defer array_ids.d();
     try expect(array_ids.values()[1].integer == 943);
 
     const objects = "[{\"n\": \"m\"}]";
-    const array_objects = try JsonList.parse(&mem, objects);
+    var array_objects = try JsonList.parse(&mem, objects);
+    defer array_objects.d();
     try expect(String.equalStr(array_objects.values()[0].object.get("n").?.string, "m"));
 }
 
-test "Json: parse" {
-    const json_str =
-        '''
-        {
-          "Image": {
-              "Width":  800,
-              "Height": 600,
-              "Title":  "View from 15th Floor",
-              "File":  null,
-              "Thumbnail": {
-                  "Url":    "http://www.example.com/image/481989943",
-                  "Height": 125,
-                  "Width":  100
-              },
-              "Animated" : false,
-              "IDs": [116, 943, 234, 38793],
-              "ArrayOfObject": [{"n": "m"}],
-              "double": 1.3412,
-              "LargeInt": 18446744073709551615
-            }
-        }
-        '''
-    ;
-    // init heap memory
-     var mem = Mem.a();
-    mem.f();
-    defer mem.d();
-
-    const json_value = try Json.parse(&mem, json_str);
-
-    const image = json_value.object.get("Image").?;
-
-    try expect(image.object.get("Width").?.integer == 800);
-
-    try expect(image.object.get("File").?.null == {});
-
-    try expect(image.object.get("Animated").?.bool == false);
-
-    const ids = image.object.get("IDs").?;
-    try expect(ids.array.items[1].integer == 943);
-
-    const list_of_map = image.object.get("ArrayOfObject").?;
-    try expect(String.equalStr(list_of_map.array.items[0].object.get("n").?.string, "m"));
-
-    const double = image.object.get("double").?;
-    try expect(double.float == 1.3412);
-
-    const large_int = image.object.get("LargeInt").?;
-    try expect(String.equalStr(large_int.number_string, "18446744073709551615"));
-}
 test "Json: toStr" {
     var buffer: [10000]u8 = undefined;
 
@@ -674,7 +633,7 @@ const List = DataType.List;
 test "List: a values()" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var list = List.t(u8).a(&mem);
@@ -691,19 +650,21 @@ test "List: a values()" {
     try expect(list.values()[1] == 9);
 
     var list2 = List.t(str).a(&mem);
+    defer list2.d();
     try list2.add("1");
     try list2.add("2");
     try list2.add("3");
     try expect(String.equalStr(list2.values()[1], "2"));
 
     var list3 = try list2.clone();
+    defer list3.d();
     try expect(String.equalStr(list3.values()[1], "2"));
 }
 
 test "List: a2 toArray" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var array: []u8 = [1,3,5];
@@ -719,24 +680,75 @@ test "List: a2 toArray" {
     try expect(list.values().len == 6);
 
     const array2 = try list.toArray();
+    defer mem.free2(array2);
     try expect(array2[5] == 5);
 }
 
+const Queue = DataType.Queue;
+test "Queue: has zero count" {
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
+    defer mem.d();
+
+    var queue = Queue.t(u8).a(&mem);
+    defer queue.d();
+
+    try expectEqual(0, queue.count());
+}
+test "Queue: add + pop single item" {
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
+    defer mem.d();
+
+    var queue = Queue.t(u8).a(&mem);
+    defer queue.d();
+
+    try queue.add(3);
+    try expectEqual(1, queue.count());
+    const v = queue.pop();
+    try expectEqual(3, v.?);
+    try expectEqual(0, queue.count());
+}
+test "Queue: FIFO order" {
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
+    defer mem.d();
+
+    var queue = Queue.t(u8).a(&mem);
+    defer queue.d();
+
+    for (0..5) |i| {
+        try queue.add(DataType.intCast(u8, i));
+    }
+    for (0..5) |i| {
+        try expectEqual(i, queue.pop().?);
+    }
+}
 
 const Map = DataType.Map;
 test "Map: t" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var map = Map.t(u8, str).a(&mem);
+    defer map.d();
     try map.add(1, "a");
     try map.add(2, "b");
     try map.add(3, "c");
 
     try expect(String.equalStr(map.get(2).?, "b"));
     try expect(map.count() == 3);
+
+    var iter = map.map.iterator();
+    while (iter.next()) |entry| {
+        Console.print2("entry.key_ptr.*={d}\n", .{entry.key_ptr.*});
+        Console.print2("entry.value_ptr.*={s}\n", .{entry.value_ptr.*});
+    }
 }
 
 
@@ -744,16 +756,23 @@ const StringMap = DataType.StringMap;
 test "StringMap: t" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
-    var param = StringMap.t(u8).a(&mem);
-    try param.add("a", 1);
-    try param.add("b", 2);
-    try param.add("c", 3);
+    var map = StringMap.t(u8).a(&mem);
+    defer map.d();
+    try map.add("a", 1);
+    try map.add("b", 2);
+    try map.add("c", 3);
 
-    try expect(param.get("b").? == 2);
-    try expect(param.count() == 3);
+    try expect(map.get("b").? == 2);
+    try expect(map.count() == 3);
+
+    var iter = map.map.iterator();
+    while (iter.next()) |entry| {
+        Console.print2("entry.key_ptr.*={s}\n", .{entry.key_ptr.*});
+        Console.print2("entry.value_ptr.*={d}\n", .{entry.value_ptr.*});
+    }
 }
 
 
@@ -832,20 +851,25 @@ test "String: a" {
 test "String: clone" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
-    const string = try String.a(&mem, "abc");
-    const string_clone = try string.clone();
+    var string = try String.a(&mem, "abc");
+    defer string.d();
+    var string_clone = try string.clone();
+    defer string_clone.d();
 
     try expect(string.equal(string_clone));
 }
 
 test "String: count" {
-    var buffer: [100]u8 = undefined;
-    var mem = Mem.as(&buffer);
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
+    defer mem.d();
 
-    const string = try String.a(&mem, "abc,d,ef");
+    var string = try String.a(&mem, "abc,d,ef");
+    defer string.d();
 
     try expect(string.count(",") == 2);
 }
@@ -861,61 +885,105 @@ test "String: indexOf lastIndexOf" {
 }
 
 test "String: replace" {
-    var buffer: [100]u8 = undefined;
-    var mem = Mem.as(&buffer);
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
+    defer mem.d();
 
-    const string = try String.a(&mem, "abc,def,ghi");
-    const string_new = try string.replace(",", "|");
+    var string = try String.a(&mem, "abc,def,ghi");
+    defer string.d();
+    var string_new = try string.replace(",", "|");
+    defer string_new.d();
 
     try expect(String.equalStr(string_new.toStr(), "abc|def|ghi"));
 }
 
 test "String: split" {
-    var buffer: [300]u8 = undefined;
-    var mem = Mem.as(&buffer);
+    // var buffer: [300]u8 = undefined;
+    // var mem = Mem.as(&buffer);
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
+    defer mem.d();
 
-    const string = try String.a(&mem, "abc,def,ghi");
+    var string = try String.a(&mem, "abc,def,ghi");
+    defer string.d();
     const string_array = try string.split(",");
+    defer {
+        for (string_array) |string_item| {
+            var _string = string_item;
+            _string.d();
+        }
+        mem.free2(string_array);
+    }
 
     try expect(String.equalStr(string_array[1].toStr(), "def"));
 }
 
 test "String: utf8Array" {
-    var buffer: [300]u8 = undefined;
-    var mem = Mem.as(&buffer);
+    // var buffer: [300]u8 = undefined;
+    // var mem = Mem.as(&buffer);
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
+    defer mem.d();
 
-    const string = try String.a(&mem, "abc中文123");
+    var string = try String.a(&mem, "abc中文123");
+    defer string.d();
     const str_array = try string.utf8Array();
+    defer {
+        for (str_array) |str_item| {
+            mem.free2(str_item);
+        }
+        mem.free2(str_array);
+    }
 
     try expect(String.equalStr(str_array[3], "中"));
 }
 
 test "String: startWith endWith" {
-    var buffer: [300]u8 = undefined;
-    var mem = Mem.as(&buffer);
+    // var buffer: [300]u8 = undefined;
+    // var mem = Mem.as(&buffer);
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
+    defer mem.d();
 
-    const string = try String.a(&mem, "abc,def,ghi");
+    var string = try String.a(&mem, "abc,def,ghi");
+    defer string.d();
 
     try expect(string.startWith("abc"));
     try expect(string.endWith("hi"));
 }
 
 test "String: lower" {
-    var buffer: [1000]u8 = undefined;
-    var mem = Mem.as(&buffer);
+    // var buffer: [1000]u8 = undefined;
+    // var mem = Mem.as(&buffer);
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
+    defer mem.d();
 
-    const string = try String.a(&mem, "ABc");
-    const string2 = try string.lower();
-    Console.print2("String: lower==={s}", .{string2.toStr()});
+    var string = try String.a(&mem, "ABc");
+    defer string.d();
+    var string2 = try string.lower();
+    defer string2.d();
+    Console.print2("String: lower==={s}\n", .{string2.toStr()});
 
     try expect(String.equalStr(string2.toStr(), "abc"));
 }
 test "String: upper" {
-    var buffer: [1000]u8 = undefined;
-    var mem = Mem.as(&buffer);
+    // var buffer: [1000]u8 = undefined;
+    // var mem = Mem.as(&buffer);
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
+    defer mem.d();
 
-    const string = try String.a(&mem, " abC\n");
-    const string2 = try string.upper();
+    var string = try String.a(&mem, " abC\n");
+    defer string.d();
+    var string2 = try string.upper();
+    defer string2.d();
 
     try expect(String.equalStr(string2.toStr(), " ABC\n"));
 }
@@ -987,10 +1055,15 @@ test "String: subStr" {
 
 test "String: formatStr" {
     // init stack memory
-    var buffer: [1024]u8 = undefined;
-    var mem = Mem.as(&buffer);
+    // var buffer: [1024]u8 = undefined;
+    // var mem = Mem.as(&buffer);
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
+    defer mem.d();
 
     const str_format = try String.formatStr(&mem, "{s}+{s}={s}", ["a", "b", "c"]);
+    defer mem.free2(str_format);
 
     try expect(String.equalStr(str_format, "a+b=c"));
 }
@@ -1005,10 +1078,11 @@ test "String: formatStr2" {
 test "String: joinStr" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     const str_join = String.joinStr(&mem, ",", &[ "a", "b", "c" ]) catch(err) return err;
+    defer mem.free2(str_join);
 
     try expect(String.equalStr(str_join, "a,b,c"));
 }
@@ -1034,11 +1108,12 @@ test "String: replaceStr2" {
 test "String: splitStr" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     const string = "abc,def,ghi";
     const str_array = try String.splitStr(&mem, string, ",");
+    defer mem.free2(str_array);
 
     try expect(String.equalStr(str_array[1], "def"));
 }
@@ -1085,8 +1160,12 @@ test "String: utf8Iter" {
 
 const Tensor = DataType.Tensor;
 test "Tensor: rand" {
-    var buffer: [1000]u8 = undefined;
-    var mem = Mem.as(&buffer);
+    // var buffer: [1000]u8 = undefined;
+    // var mem = Mem.as(&buffer);
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
+    defer mem.d();
 
     var tensor = try Tensor.rand(&mem, &[3, 6]);
     defer tensor.d();
@@ -1095,8 +1174,12 @@ test "Tensor: rand" {
 }
 
 test "Tensor: 2D" {
-    var buffer: [1000]u8 = undefined;
-    var mem = Mem.as(&buffer);
+    // var buffer: [1000]u8 = undefined;
+    // var mem = Mem.as(&buffer);
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
+    defer mem.d();
 
     // comptime array
     const mat: [2][2]f32 = [
@@ -1118,8 +1201,12 @@ test "Tensor: 2D" {
 }
 
 test "Tensor: 3D" {
-    var buffer: [1000]u8 = undefined;
-    var mem = Mem.as(&buffer);
+    // var buffer: [1000]u8 = undefined;
+    // var mem = Mem.as(&buffer);
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
+    defer mem.d();
 
     const tensor_3d: [2][2][2]f32 = [
         [
@@ -1140,8 +1227,12 @@ test "Tensor: 3D" {
 }
 
 test "Tensor: addTensor subTensor mulTensor divTensor powTensor" {
-    var buffer: [2000]u8 = undefined;
-    var mem = Mem.as(&buffer);
+    // var buffer: [2000]u8 = undefined;
+    // var mem = Mem.as(&buffer);
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
+    defer mem.d();
 
     // 1. 2x2 matrix
     const array1: [2][2]f32 = [
@@ -1186,8 +1277,12 @@ test "Tensor: addTensor subTensor mulTensor divTensor powTensor" {
 }
 
 test "Tensor: addTensor2 subTensor2 mulTensor2 divTensor2 powTensor2" {
-    var buffer: [2000]u8 = undefined;
-    var mem = Mem.as(&buffer);
+    // var buffer: [2000]u8 = undefined;
+    // var mem = Mem.as(&buffer);
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
+    defer mem.d();
 
     // 1. 2x2 matrix
     const array1: [2][2]f32 = [
@@ -1232,8 +1327,12 @@ test "Tensor: addTensor2 subTensor2 mulTensor2 divTensor2 powTensor2" {
 }
 
 test "Tensor: matMul" {
-    var buffer: [2000]u8 = undefined;
-    var mem = Mem.as(&buffer);
+    // var buffer: [2000]u8 = undefined;
+    // var mem = Mem.as(&buffer);
+    // init heap memory
+    var mem = Mem.a();
+    //mem.f();
+    defer mem.d();
 
     // 1. 2x2 matrix
     const array1: [2][2]f32 = [
@@ -1259,7 +1358,7 @@ test "Tensor: matMul" {
 test "Tensor: matMul 2" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     // 1. 3x2 matrix
@@ -1289,7 +1388,7 @@ test "Tensor: matMul 2" {
 test "Tensor: sum sum2" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     // 2x2 matrix
@@ -1324,7 +1423,7 @@ test "Tensor: sum sum2" {
 test "Tensor: mean mean2" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     // 2x2 matrix
@@ -1359,7 +1458,7 @@ test "Tensor: mean mean2" {
 test "Tensor: max max2" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     // 2x2 matrix
@@ -1394,7 +1493,7 @@ test "Tensor: max max2" {
 test "Tensor: min min2" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     // 2x2 matrix
@@ -1430,7 +1529,7 @@ test "Tensor: min min2" {
 test "Tensor: concat" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var tensor1 = try Tensor.a(&mem, &[2, 2]);
@@ -1459,7 +1558,7 @@ test "Tensor: concat" {
 test "Tensor: concat 2" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var tensor1 = try Tensor.a(&mem, &[2, 2]);
@@ -1495,7 +1594,7 @@ test "Tensor: concat 2" {
 test "Tensor: concat 3" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     // 2x2x2 tensor
@@ -1543,7 +1642,7 @@ test "Tensor: concat 3" {
 test "Tensor: stack" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     var tensor1 = try Tensor.a(&mem, &[2, 2]);
@@ -1576,7 +1675,7 @@ test "Tensor: stack" {
 test "Tensor: stack 2" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     // 2x2 tensor
@@ -1611,7 +1710,7 @@ test "Tensor: stack 2" {
 test "Tensor: stack 3" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     const array1: [3][3]f32 = [[1,2,3],[4,5,6],[7,8,9]];
@@ -1644,7 +1743,7 @@ test "Tensor: stack 3" {
 test "Tensor: reShape" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     const array1: [8]f32 = [1,2,3,4,5,6,7,8];
@@ -1659,7 +1758,7 @@ test "Tensor: reShape" {
 test "Tensor: reShape 2" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     const array1: [2][2][2]f32 = [
@@ -1684,14 +1783,15 @@ test "Tensor: reShape 2" {
 test "Tensor: view" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     const array1: [8]f32 = [1,2,3,4,5,6,7,8];
     var t1 = try Tensor.a2(&mem, array1);
     defer t1.d();
 
-    var t5 = try t1.view(&[2, 2, 2]);
+    var shape: []usize = [2, 2, 2];
+    var t5 = try t1.view(&shape);
     defer t5.d();
     Console.print2("\n{s}:\n", .{"Tensor view"});
     try t5.print();
@@ -1699,7 +1799,7 @@ test "Tensor: view" {
 test "Tensor: view 2" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     const array1: [2][2][2]f32 = [
@@ -1715,7 +1815,8 @@ test "Tensor: view 2" {
     var t1 = try Tensor.a2(&mem, array1);
     defer t1.d();
 
-    var t5 = try t1.view(&[8]);
+    var shape: []usize = [8];
+    var t5 = try t1.view(&shape);
     defer t5.d();
     Console.print2("\n{s}:\n", .{"Tensor view 2"});
     try t5.print();
@@ -1724,7 +1825,7 @@ test "Tensor: view 2" {
 test "Tensor: transpose" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     const array1: [2][2]f32 = [
@@ -1744,7 +1845,7 @@ test "Tensor: transpose" {
 test "Tensor: transpose 2" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     const array1: [3][3]f32 = [[1,2,3],[4,5,6],[7,8,9]];
@@ -1760,7 +1861,7 @@ test "Tensor: transpose 2" {
 test "Tensor: transpose 3" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     const array1: [2][2][2]f32 = [

@@ -10,6 +10,7 @@ data: []f32,
 shape: []usize,         // dim size, [2,3,4]
 stride: []usize,
 mem: *Mem,
+is_view: bool = false,
 
 //---------------------- init and deinit ----------------------
 /// create Tensor witch shape
@@ -38,6 +39,7 @@ pub fn a(mem: *Mem, shape: []const usize) !Tensor {
 /// create Tensor with array
 pub fn a2(mem: *Mem, array: anytype) !Tensor {
     const shape = try inferShape(mem.allocator(), array);
+    defer mem.free2(shape);
     var tensor = try a(mem, shape);
     try tensor.fillTensor(array);
     return tensor;
@@ -46,9 +48,11 @@ pub fn a2(mem: *Mem, array: anytype) !Tensor {
 /// free memory
 pub fn d(self: *Tensor) void {
     const allocator = self.mem.allocator();
-    allocator.free(self.shape);
+    if (!self.is_view) {
+        allocator.free(self.shape);
+        allocator.free(self.data);
+    }
     allocator.free(self.stride);
-    allocator.free(self.data);
 }
 
 /// create Tensor with rand
@@ -110,7 +114,7 @@ pub fn reShape(self: *Tensor, shape: []const usize) !Tensor {
 }
 
 /// Tensor view with new shapge, no copy data
-pub fn view(self: *Tensor, shape: []const usize) !Tensor {
+pub fn view(self: *Tensor, shape: []usize) !Tensor {
     var data_len: usize = 0;
     for (shape) |val| {
         if (data_len != 0) {
@@ -126,9 +130,10 @@ pub fn view(self: *Tensor, shape: []const usize) !Tensor {
 
     return .{
         .data = self.data,
-        .shape = try allocator.dupe(usize, shape),
+        .shape = shape,
         .stride = stride,
         .mem = self.mem,
+        .is_view = true,
     };
 }
 
@@ -166,12 +171,17 @@ pub fn print(self: *const Tensor) !void {
     const indices = try allocator.alloc(usize, self.shape.len);
     defer allocator.free(indices);
     @memset(indices, 0);
-    printRec(self, indices, 0);
+    try self.printRec(indices, 0);
     std.debug.print("\n", .{});
 }
 
-fn printRec(self: *const Tensor, indices: []usize, depth: usize) void {
-    const prefix_space: []const u8 = self.getPrefixSpace(depth);
+fn printRec(self: *const Tensor, indices: []usize, depth: usize) !void {
+    const allocator = self.mem.allocator();
+    var prefix_space: []const u8 = "";
+    if (depth > 0) {
+        prefix_space = try getPrefixSpace(allocator, depth);
+    }
+    defer allocator.free(prefix_space);
     if (depth == self.shape.len - 1) {
         std.debug.print("\n{s}[", .{prefix_space});
         for (0..self.shape[depth]) |i| {
@@ -192,7 +202,7 @@ fn printRec(self: *const Tensor, indices: []usize, depth: usize) void {
         std.debug.print("\n{s}[", .{prefix_space});
         for (0..self.shape[depth]) |i| {
             indices[depth] = i;
-            self.printRec(indices, depth + 1);
+            try self.printRec(indices, depth + 1);
         }
         if (depth != 0 and indices[depth - 1] != self.shape[depth - 1] - 1) {
             std.debug.print("\n{s}],", .{prefix_space});
@@ -201,13 +211,9 @@ fn printRec(self: *const Tensor, indices: []usize, depth: usize) void {
         }
     }
 }
-fn getPrefixSpace(self: *const Tensor, depth: usize) []const u8 {
-    var prefix_space: []const u8 = "";
-    var count: usize = 0;
-    while (count < depth) {
-        prefix_space = std.mem.concat(self.mem.allocator(), u8, &.{ prefix_space, "  " }) catch return prefix_space;
-        count += 1;
-    }
+fn getPrefixSpace(allocator: Allocator, depth: usize) ![]const u8 {
+    const prefix_space = try allocator.alloc(u8, depth * 2);
+    @memset(prefix_space, ' ');
     return prefix_space;
 }
 fn printRec2(self: *const Tensor, indices: []usize, depth: usize) void {
@@ -337,6 +343,7 @@ pub fn powTensor(t1: Tensor, t2: Tensor) !Tensor {
 pub fn addTensor2(t1: Tensor, t2: Tensor) !Tensor {
     const allocator = t1.mem.allocator();
     const new_shape = try broadcastShapes(t1.shape, t2.shape, allocator);
+    defer allocator.free(new_shape);
     var result = try Tensor.a(t1.mem, new_shape);
 
     const indices = try allocator.alloc(usize, new_shape.len);
@@ -362,6 +369,7 @@ fn addRec(t1: Tensor, t2: Tensor, result: *Tensor, indices: []usize, depth: usiz
 pub fn subTensor2(t1: Tensor, t2: Tensor) !Tensor {
     const allocator = t1.mem.allocator();
     const new_shape = try broadcastShapes(t1.shape, t2.shape, allocator);
+    defer allocator.free(new_shape);
     var result = try Tensor.a(t1.mem, new_shape);
 
     const indices = try allocator.alloc(usize, new_shape.len);
@@ -387,6 +395,7 @@ fn subRec(t1: Tensor, t2: Tensor, result: *Tensor, indices: []usize, depth: usiz
 pub fn mulTensor2(t1: Tensor, t2: Tensor) !Tensor {
     const allocator = t1.mem.allocator();
     const new_shape = try broadcastShapes(t1.shape, t2.shape, allocator);
+    defer allocator.free(new_shape);
     var result = try Tensor.a(t1.mem, new_shape);
 
     const indices = try allocator.alloc(usize, new_shape.len);
@@ -412,6 +421,7 @@ fn mulRec(t1: Tensor, t2: Tensor, result: *Tensor, indices: []usize, depth: usiz
 pub fn divTensor2(t1: Tensor, t2: Tensor) !Tensor {
     const allocator = t1.mem.allocator();
     const new_shape = try broadcastShapes(t1.shape, t2.shape, allocator);
+    defer allocator.free(new_shape);
     var result = try Tensor.a(t1.mem, new_shape);
 
     const indices = try allocator.alloc(usize, new_shape.len);
@@ -437,6 +447,7 @@ fn divRec(t1: Tensor, t2: Tensor, result: *Tensor, indices: []usize, depth: usiz
 pub fn powTensor2(t1: Tensor, t2: Tensor) !Tensor {
     const allocator = t1.mem.allocator();
     const new_shape = try broadcastShapes(t1.shape, t2.shape, allocator);
+    defer allocator.free(new_shape);
     var result = try Tensor.a(t1.mem, new_shape);
 
     const indices = try allocator.alloc(usize, new_shape.len);
@@ -472,6 +483,7 @@ pub fn matMul(t1: Tensor, t2: Tensor) !Tensor {
     // calculate dim
     const batch_dims = t1.shape[0 .. t1.shape.len - 2];
     const new_shape = try allocator.alloc(usize, batch_dims.len + 2);
+    defer allocator.free(new_shape);
     @memcpy(new_shape[0..batch_dims.len], batch_dims);
     new_shape[new_shape.len - 2] = a_rows;
     new_shape[new_shape.len - 1] = b_cols;
@@ -497,10 +509,13 @@ fn matMulRec(t1: Tensor, t2: Tensor, result: *Tensor, batch_indices: []usize, de
                 var _sum: f32 = 0;
                 for (0..a_cols) |k| {
                     const a_idx = try std.mem.concat(allocator, usize, &.{batch_indices, &[_]usize{ i, k }});
+                    defer allocator.free(a_idx);
                     const b_idx = try std.mem.concat(allocator, usize, &.{batch_indices, &[_]usize{ k, j }});
+                    defer allocator.free(b_idx);
                     _sum += t1.get(a_idx) * t2.get(b_idx);
                 }
                 const result_idx = try std.mem.concat(allocator, usize, &.{batch_indices, &[_]usize{ i, j }});
+                defer allocator.free(result_idx);
                 result.set(result_idx, _sum);
             }
         }
@@ -712,6 +727,7 @@ pub fn concat(tensors: []const Tensor, dim: usize) !Tensor {
     const allocator = t1.mem.allocator();
     const source_shape = tensors[0].shape;
     const new_shape = try allocator.dupe(usize, source_shape);
+    defer allocator.free(new_shape);
     new_shape[dim] = 0;
     for (tensors) |tensor| {
         new_shape[dim] += tensor.shape[dim];
@@ -771,6 +787,7 @@ pub fn stack(tensors: []const Tensor, dim: usize) !Tensor {
     const allocator = t1.mem.allocator();
     const source_shape = t1.shape;
     const new_shape = try allocator.alloc(usize, source_shape.len + 1);
+    defer allocator.free(new_shape);
     for (0..dim) |i| new_shape[i] = source_shape[i];
     new_shape[dim] = tensors.len;
     for (dim..source_shape.len) |i| new_shape[i + 1] = source_shape[i];
@@ -796,14 +813,14 @@ fn stackRec(result: *Tensor, source: Tensor, indices: []usize, depth: usize, dim
 
     const num: usize = if (depth > dim) 1 else 0;
     if (depth == source.shape.len + num) {
-        var source_indices: []usize = undefined;
+        var value: f32 = undefined;
         if (dim == 0) {
-            source_indices = indices[1..];
+            value = source.get(indices[1..]);
         } else {
-            source_indices = try std.mem.concat(source.mem.allocator(), usize, &.{indices[0..dim], indices[dim+1..]});
+            const source_indices = try std.mem.concat(source.mem.allocator(), usize, &.{indices[0..dim], indices[dim+1..]});
+            defer source.mem.allocator().free(source_indices);
+            value = source.get(source_indices);
         }
-
-        const value = source.get(source_indices);
         result.set(indices, value);
     } else {
         const current_dim = if (depth < dim) depth else depth - 1;
@@ -862,6 +879,7 @@ pub fn inferShape(allocator: Allocator, array: anytype) ![]usize {
         try shape.append(allocator, len);
         if (@TypeOf(array[0]) != f32) {
             const slice = try inferShape(allocator, array[0]);
+            defer allocator.free(slice);
             if (slice.len > 0) {
                 try shape.appendSlice(allocator, slice);
             }

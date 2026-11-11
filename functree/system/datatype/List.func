@@ -55,6 +55,16 @@ pub fn t(comptime T: type) type {
         pub fn addArray2(self: *Self, i: usize, slice: []const T) !void {
             try self.list.insertSlice(self.mem.allocator(), i, slice);
         }
+        /// Remove the element at index `i`, shift elements after index
+        /// `i` forward, and return the removed element.
+        /// Invalidates element pointers to end of list.
+        /// This operation is O(N).
+        /// This preserves item order. Use `swapRemove` if order preservation is not important.
+        /// Asserts that the index is in bounds.
+        /// Asserts that the list is not empty.
+        pub fn remove(self: *Self, i: usize) T {
+            return self.list.orderedRemove(i);
+        }
         /// Remove and return the last element from the list, or return `null` if list is empty.
         /// Invalidates element pointers to the removed element, if any.
         pub fn pop(self: *Self) ?T {
@@ -62,7 +72,7 @@ pub fn t(comptime T: type) type {
         }
         /// Invalidates all element pointers.
         pub fn clear(self: *Self) void {
-            return self.list.clearAndFree();
+            return self.list.clearAndFree(self.mem.allocator());
         }
         pub fn toArray(self: *Self) ![]T {
             return try self.list.toOwnedSlice(self.mem.allocator());

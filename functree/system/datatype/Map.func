@@ -50,11 +50,17 @@ pub fn t(comptime K: type, comptime V: type) type {
         pub fn remove(self: *Self, key: K) bool {
             return self.map.remove(key);
         }
+        pub fn clear(self: *Self) bool {
+            return self.map.clearRetainingCapacity();
+        }
+        // pub fn iter(self: Self) std.AutoHashMap(K, V).Iterator {
+        //     return self.map.iterator();
+        // }
         pub fn keys(self: Self) ![]const K {
             var key_array = try self.mem.alloc2(K, self.count());
-            var iter = self.map.keyIterator();
+            var key_iter = self.map.keyIterator();
             var i: usize = 0;
-            while (iter.next()) |key| {
+            while (key_iter.next()) |key| {
                 key_array[i] = key.*;
                 i += 1;
             }
@@ -62,9 +68,9 @@ pub fn t(comptime K: type, comptime V: type) type {
         }
         pub fn values(self: Self) ![]const V {
             var value_array = try self.mem.alloc2(V, self.count());
-            var iter = self.map.valueIterator();
+            var value_iter = self.map.valueIterator();
             var i: usize = 0;
-            while (iter.next()) |value| {
+            while (value_iter.next()) |value| {
                 value_array[i] = value.*;
                 i += 1;
             }

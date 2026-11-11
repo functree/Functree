@@ -180,11 +180,15 @@ const Process = System.Process;
 test "Process: a" {
     // init heap memory
     var mem = Mem.a();
-    mem.f();
+    //mem.f();
     defer mem.d();
 
     const argv: []str = ["zig", "version"];
     var process = try Process.a(&mem, &argv);
-    defer process.d();
-    Console.print2("zig_version={s}", .{process.result.stdout});
+    defer {
+        mem.free2(process.result.stderr);
+        mem.free2(process.result.stdout);
+        process.d();
+    }
+    Console.print2("zig_version={s}\n", .{process.result.stdout});
 }

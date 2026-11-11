@@ -36,7 +36,7 @@ pub fn a(mem: *Mem, absolute_path: str) !Dir {
     const io = mem.io();
     return a2(mem, absolute_path, io);
 }
-/// get a Dir with absolute path with options, if not exist will create it
+/// get a Dir with absolute path with io param, if not exist will create it
 pub fn a2(mem: *Mem, absolute_path: str, io: std.Io) !Dir {
     var dir = std.Io.Dir.openDirAbsolute(io, absolute_path, .{.iterate = true}) catch null;
     if (dir == null) {
@@ -136,7 +136,9 @@ code('''
 pub fn getTmpDir(mem: *Mem) !Dir {
     const io = mem.io();
     const random_dir_name = try getRandName(mem.allocator(), 16);
+    defer mem.free2(random_dir_name);
     const temp_dir_path = try Fs.joinPath(mem, &.{".cache/tmp", random_dir_name});
+    defer mem.free2(temp_dir_path);
     const cwd = std.Io.Dir.cwd();
     const dir = try cwd.createDirPathOpen(io, temp_dir_path, .{.open_options = .{.iterate = true}});
     //try cwd.createDirPath(io, temp_dir_path);
@@ -183,6 +185,7 @@ pub fn openDirPath2(mem: *Mem, absolute_path: str, options: OpenOptions) !Dir {
     return Dir{.dir=dir, .mem=mem, .io=io};
 }
 /// create a new directory, based on an absolute path.
+/// the parent dir of the absolute path must be exist, otherwise use the createDirPathAll method.
 pub fn createDirPath(mem: *Mem, absolute_path: str) !void {
     const io = mem.io();
     try std.Io.Dir.createDirAbsolute(io, absolute_path, .default_file);
@@ -192,19 +195,21 @@ pub fn createDirPathAll(mem: *Mem, absolute_path: str) !void {
     if (!Fs.isAbsPath(absolute_path)) return error.NotAbsolutePath;
 
     const io = mem.io();
-    var new_path = try String.replaceStr(mem, absolute_path, "\\", "/");
+    const new_path = try String.replaceStr(mem, absolute_path, "\\", "/");
     defer mem.free2(new_path);
 
     const dir_name_array = try String.splitStr(mem, new_path, "/");
     defer mem.free2(dir_name_array);
-    new_path = "";
-    for (dir_name_array) |dir_name| {
-        new_path = try Fs.joinPath(mem, &[new_path, dir_name]);
-        if (!existPath(mem, new_path)) {
-            try std.Io.Dir.createDirAbsolute(io, new_path, .default_file);
+
+    for (dir_name_array, 0..) |_, index| {
+        const dir_path = try Fs.joinPath(mem, dir_name_array[0 .. index + 1]);
+        defer mem.free2(dir_path);
+        if (!existPath(mem, dir_path)) {
+            try std.Io.Dir.createDirAbsolute(io, dir_path, .default_file);
         }
     }
 }
+
 /// change the name or location of a file or directory.
 pub fn renamePath(mem: *Mem, old_absolute_path: str, new_absolute_path: str) !void {
     const io = mem.io();

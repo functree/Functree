@@ -8,6 +8,7 @@ pub const List = import("datatype/List.func");
 pub const Map = import("datatype/Map.func");
 pub const StringMap = import("datatype/StringMap.func");
 pub const StaticStringMap = import("datatype/StaticStringMap.func");
+pub const Queue = import("datatype/Queue.func");
 pub const Result = import("datatype/Result.func");
 pub const String = import("datatype/String.func");
 pub const Tensor = import("datatype/Tensor.func");

@@ -9,6 +9,9 @@ pub const Tag = std.Target.Os.Tag;
 pub const VersionRange = std.Target.Os.VersionRange;
 pub const Abi = std.Target.Abi;
 pub const ObjectFormat = std.Target.ObjectFormat;
+pub const Windows = std.os.windows;
+pub const Linux = std.os.linux;
+pub const Clang = std.c;
 
 tag: Tag,
 version_range: VersionRange,

@@ -1,0 +1,39 @@
+const Mem = import("../../Mem.func");
+const Mutex = import("Mutex.func");
+
+code(
+'''
+const std = @import("std");
+
+mem: *Mem,
+condition: std.Io.Condition,
+io: std.Io,
+
+/// init a Condition
+pub fn a(mem: *Mem) Condition {
+   const io = mem.io();
+   const condition: std.Io.Condition = .init;
+   return .{.mem=mem, .condition=condition, .io=io};
+}
+pub fn a2(mem: *Mem, io: std.Io) Condition {
+    const condition: std.Io.Condition = .init;
+    return .{.mem=mem, .condition=condition, .io=io};
+}
+/// deinit a Condition
+pub fn d(self: *Condition) void {
+    self.* = undefined;
+}
+
+pub fn wait(self: *Condition, mutex: *Mutex) void {
+    self.condition.waitUncancelable(self.io, &mutex.mutex);
+}
+
+pub fn signal(self: *Condition) void {
+    self.condition.signal(self.io);
+}
+
+pub fn broadcast(self: *Condition) void {
+    self.condition.broadcast(self.io);
+}
+'''
+);

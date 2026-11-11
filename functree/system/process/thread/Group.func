@@ -3,7 +3,6 @@ const Mem = import("../../Mem.func");
 code(
 '''
 const std = @import("std");
-const builtin = @import("builtin");
 
 mem: *Mem,
 group: std.Io.Group,

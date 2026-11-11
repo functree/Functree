@@ -19,9 +19,12 @@ pub fn getJsonValue(mem: *Mem, value: anytype) !*JsonValue {
         .null => json_value.* = .null,
         .bool => json_value.* = .{.bool = value},
         .int, .comptime_int, .float, .comptime_float => {
-            const buffer = try mem.alloc2(u8, 50);
-            const string = try String.formatStr2(buffer, "{d}", .{value});
-            json_value.* = JsonValue.parseFromNumberSlice(string);
+            const string = try String.formatStr(mem, "{d}", .{value});
+            const val = parseFromNumberSlice(string);
+            if (val != .number_string) {
+                defer mem.free2(string);
+            }
+            json_value.* = val;
         },
         .optional => {
             if (value) |val| {
@@ -37,11 +40,15 @@ pub fn getJsonValue(mem: *Mem, value: anytype) !*JsonValue {
                     const ty_child = @typeInfo(type_info.child);
                     switch (ty_child) {
                         .array => {
+                            defer mem.free(json_value);
                             // Coerce `*[N]T` to `[]const T`.
                             const Slice = []const std.meta.Elem(type_info.child);
                             return try getJsonValue(mem, @as(Slice, value));
                         },
-                        else => return try getJsonValue(mem, value.*),
+                        else => {
+                            defer mem.free(json_value);
+                            return try getJsonValue(mem, value.*);
+                        },
                     }
                 },
                 .many, .slice => {
@@ -58,6 +65,7 @@ pub fn getJsonValue(mem: *Mem, value: anytype) !*JsonValue {
                     }
 
                     for (slice) |x| {
+                        defer mem.free(json_value);
                         return try getJsonValue(mem, x);
                     }
                 },
@@ -78,51 +86,40 @@ pub fn getJsonValue(mem: *Mem, value: anytype) !*JsonValue {
             return error.NoSupportValueType;
         },
     }
-    // switch (T) {
-    //     bool => json_value = .{.bool = value},
-    //     i8, i16, i32, i64, i128, u8, u16, u32, u64, u128, f16, f32, f64, f80, f128, isize, usize, comptime_int, comptime_float => {
-    //         var buffer: [30]u8 = undefined;
-    //         const string = try String.formatStr2(&buffer, "{d}", .{value});
-    //         json_value = JsonValue.parseFromNumberSlice(string);
-    //     },
-    //     ?i8, ?i16, ?i32, ?i64, ?i128, ?u8, ?u16, ?u32, ?u64, ?u128, ?f16, ?f32, ?f64, ?f80, ?f128 => {
-    //         if (value) |v| {
-    //             var buffer: [30]u8 = undefined;
-    //             const string = try String.formatStr2(&buffer, "{d}", .{v});
-    //             json_value = JsonValue.parseFromNumberSlice(string);
-    //         } else {
-    //             json_value = .null;
-    //         }
-    //     },
-    //     @TypeOf(null) =>{
-    //         json_value = .null;
-    //     },
-    //     else => {
-    //         const type_name = DataType.typeName(T);
-    //         std.debug.print("{s}\n", .{type_name});
-    //         if (String.equalStr(type_name, "functree_system_datatype_json_JsonMap")) {
-    //             json_value = .{.object = value.object};
-    //         } else if (String.equalStr(type_name, "functree_system_datatype_json_JsonList")) {
-    //             json_value = .{.array = value.array};
-    //         } else if (String.equalStr(type_name, "json.dynamic.Value") or String.equalStr(type_name, "std.json.dynamic.Value")) {
-    //             json_value = value;
-    //         } else {
-    //             json_value = .{.string = value};
-    //         }
-    //     },
-    // }
     return json_value;
+}
+fn parseFromNumberSlice(s: []const u8) JsonValue {
+    if (!isNumberFormattedLikeAnInteger(s)) {
+        const f = std.fmt.parseFloat(f64, s) catch unreachable;
+        if (std.math.isFinite(f)) {
+            return JsonValue{ .float = f };
+        } else {
+            return JsonValue{ .number_string = s };
+        }
+    }
+    if (std.fmt.parseInt(i64, s, 10)) |i| {
+        return JsonValue{ .integer = i };
+    } else |e| {
+        switch (e) {
+            error.Overflow => return JsonValue{ .number_string = s },
+            error.InvalidCharacter => unreachable,
+        }
+    }
+}
+/// This function returns true if the number doesn't contain any fraction or exponent components, and is not `-0`.
+/// Note, the numeric value encoded by the value may still be an integer, such as `1.0`.
+/// This function is meant to give a hint about whether integer parsing or float parsing should be used on the value.
+/// This function will not give meaningful results on non-numeric input.
+fn isNumberFormattedLikeAnInteger(value: []const u8) bool {
+    if (std.mem.eql(u8, value, "-0")) return false;
+    return std.mem.findAny(u8, value, ".eE") == null;
 }
 '''
 );
-
-pub fn parse(mem: *Mem, json_str: str) !JsonValue {
-    const parsed = try std.json.parseFromSlice(JsonValue, mem.allocator(), json_str, .{});
-    return parsed.value;
-}
 
 pub fn toStr(buffer: []u8, value: anytype) ![]u8 {
     var w: std.Io.Writer = .fixed(buffer);
     try std.json.Stringify.value(value, .{}, &w);
     return w.buffered();
 }
+

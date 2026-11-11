@@ -36,6 +36,9 @@ pub fn testThreadName(thread: *Thread) !void {
     for (testCases) |tc| {
         try thread.setName(tc);
         const name = try thread.getName();
+        defer {
+            if (name) |na| thread.mem.free2(na);
+        }
         if (name != null) {
             const value = name.?;
 

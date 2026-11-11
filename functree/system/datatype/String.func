@@ -128,8 +128,14 @@ pub fn endWith(self: String, needle: str) bool {
 
 /// Returns a slices of `buffer` that are separated by the byte sequence in `delimiter`.
 pub fn split(self: String, delimiter: str) ![]String {
-    var splitArr = List.t(String).a(self.mem);
-    errdefer splitArr.d();
+    var list = List.t(String).a(self.mem);
+    defer {
+        for (list.values()) |item| {
+            var string = item;
+            string.d();
+        }
+        list.d();
+    }
 
     var it = std.mem.splitSequence(u8, self.bytes, delimiter);
     while (it.next()) |item| {
@@ -137,9 +143,9 @@ pub fn split(self: String, delimiter: str) ![]String {
             .mem = self.mem,
             .bytes = try self.mem.allocator().dupe(u8, item),
         };
-        try splitArr.add(string);
+        try list.add(string);
     }
-    return try splitArr.toArray();
+    return try list.toArray();
 }
 
 /// Converts all (ASCII) uppercase letters to lowercase
@@ -369,6 +375,17 @@ pub fn countStr(value: str, needle: str) usize {
     return std.mem.count(u8, value, needle);
 }
 
+/// Compares two str, value1 larger than value2 return 1, value1 less than value2 return -1, value1 equal value2 return 0.
+pub fn compareStr(value1: str, value2: str) i8 {
+    const order = std.mem.order(u8, value1, value2);
+    if (order == .gt) {
+        return 1;
+    } else if (order == .lt) {
+        return -1;
+    } else {
+        return 0;
+    }
+}
 /// Compares two str and returns whether they are equal.
 pub fn equalStr(value1: str, value2: str) bool {
     return std.mem.eql(u8, value1, value2);
@@ -402,15 +419,20 @@ pub fn splitStr(mem: *Mem, value: str, delimiter: str) ![]str {
     const allocator = mem.allocator();
     code(
     '''
-    var splitArr: std.ArrayList([]const u8) = .empty;
-    defer splitArr.deinit(allocator);
+    var list: std.ArrayList([]const u8) = .empty;
+    defer {
+        for (list.items) |item| {
+            allocator.free(item);
+        }
+        list.deinit(allocator);
+    }
     '''
     );
     var it = std.mem.splitSequence(u8, value, delimiter);
     while (it.next()) |item| {
-        try splitArr.append(allocator, item);
+        try list.append(allocator, item);
     }
-    return try splitArr.toOwnedSlice(allocator);
+    return try list.toOwnedSlice(allocator);
 }
 
 /// Converts all (ASCII) uppercase letters to lowercase

@@ -41,17 +41,26 @@ pub fn t(comptime V: type) type {
         pub fn get(self: Self, key: []const u8) ?V {
             return self.map.get(key);
         }
+        pub fn getPtr(self: Self, key: []const u8) ?*V {
+            return self.map.getPtr(key);
+        }
         pub fn add(self: *Self, key: []const u8, value: V) !void {
             return try self.map.put(key, value);
         }
         pub fn remove(self: *Self, key: []const u8) bool {
             return self.map.remove(key);
         }
+        pub fn clear(self: *Self) bool {
+            return self.map.clearRetainingCapacity();
+        }
+        // pub fn iter(self: Self) std.StringHashMap(V).Iterator {
+        //     return self.map.iterator();
+        // }
         pub fn keys(self: Self) ![]const []const u8 {
             var key_array = try self.mem.alloc2([]const u8, self.count());
-            var iter = self.map.keyIterator();
+            var key_iter = self.map.keyIterator();
             var i: usize = 0;
-            while (iter.next()) |key| {
+            while (key_iter.next()) |key| {
                 key_array[i] = key.*;
                 i += 1;
             }
@@ -59,9 +68,9 @@ pub fn t(comptime V: type) type {
         }
         pub fn values(self: Self) ![]const V {
             var value_array = try self.mem.alloc2(V, self.count());
-            var iter = self.map.valueIterator();
+            var value_iter = self.map.valueIterator();
             var i: usize = 0;
-            while (iter.next()) |value| {
+            while (value_iter.next()) |value| {
                 value_array[i] = value.*;
                 i += 1;
             }

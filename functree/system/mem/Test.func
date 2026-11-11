@@ -9,7 +9,6 @@ const expectEqualSlices = FunctreeTest.expectEqualSlices;
 const expectEqualStrings = FunctreeTest.expectEqualStrings;
 
 test "Mem: a Heap" {
-
     // a Heap
     var mem = Mem.a();
     defer mem.d();
@@ -26,15 +25,16 @@ test "Mem: a Heap" {
 }
 
 test "Mem: a Heap, auto free" {
-
     // a Heap
     var mem = Mem.a();
     // auto free memory
-    mem.f();
+    //mem.f();
     defer mem.d();
 
-    const string = try String.a(&mem, "abc,def,ghi");
-    const string_upper = try string.upper();
+    var string = try String.a(&mem, "abc,def,ghi");
+    defer string.d();
+    var string_upper = try string.upper();
+    defer string_upper.d();
 
     try expect(String.equalStr(string_upper.toStr(), "ABC,DEF,GHI"));
 }

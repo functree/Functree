@@ -13,9 +13,50 @@ pub const Response = std.http.Client.Response;
 '''
 );
 
-pub fn get(mem: *Mem, url: str) !str {
+// mem: *Mem,
+// io: std.Io,
+// client: std.http.Client,
+
+// /// get a Http Client
+// pub fn a(mem: *Mem) HttpClient {
+//     const io = mem.io();
+//     return a2(mem, io);
+// }
+// /// get a Http Client with io param
+// pub fn a2(mem: *Mem, io: std.Io) HttpClient {
+//     const client: std.http.Client = .{ .allocator = mem.allocator(), .io = io };
+//     return HttpClient{.mem=mem, .io=io, .client=client};
+// }
+// /// deinit a HttpClient
+// pub fn d(self: *HttpClient) void {
+//     self.client.deinit();
+//     //if (self.wa != null) self.wa.?.deinit();
+//     self.* = undefined;
+// }
+
+// pub fn get(self: *HttpClient, url: str) !str {
+//     const allocator = self.mem.allocator();
+//     var wa: std.Io.Writer.Allocating = .init(allocator);
+//     defer wa.deinit();
+//     try wa.ensureUnusedCapacity(64);
+
+//     const res = try self.client.fetch(.{
+//         .location = .{ .url = url },
+//         .method = .GET,
+//         .response_writer = &wa.writer,
+//     });
+//     if (res.status == .ok) {
+//         return wa.writer.buffered();
+//     } else {
+//         return error.HttpFetchFail;
+//     }
+// }
+
+
+pub fn getUrl(mem: *Mem, url: str) !str {
     const allocator = mem.allocator();
     var wa: std.Io.Writer.Allocating = .init(allocator);
+    defer wa.deinit();
     try wa.ensureUnusedCapacity(64);
 
     var http_client: std.http.Client = .{ .allocator = allocator, .io = mem.io() };
@@ -26,14 +67,15 @@ pub fn get(mem: *Mem, url: str) !str {
         .response_writer = &wa.writer,
     });
     if (res.status == .ok) {
-        return wa.writer.buffered();
+        return try allocator.dupe(u8, wa.writer.buffered());
     } else {
         return error.HttpFetchFail;
     }
 }
-pub fn get2(mem: *Mem, url: str, headers: []str) !str {
+pub fn getUrl2(mem: *Mem, url: str, headers: []str) !str {
     const allocator = mem.allocator();
     var wa: std.Io.Writer.Allocating = .init(allocator);
+    defer wa.deinit();
     try wa.ensureUnusedCapacity(64);
 
     var header_buf: [20]std.http.Header = undefined;
@@ -53,15 +95,16 @@ pub fn get2(mem: *Mem, url: str, headers: []str) !str {
         .response_writer = &wa.writer,
     });
     if (res.status == .ok) {
-        return wa.writer.buffered();
+        return try allocator.dupe(u8, wa.writer.buffered());
     } else {
         return error.HttpFetchFail;
     }
 }
 
-pub fn post(mem: *Mem, url: str, data: str) ![]u8 {
+pub fn postUrl(mem: *Mem, url: str, data: str) ![]u8 {
     const allocator = mem.allocator();
     var wa: std.Io.Writer.Allocating = .init(allocator);
+    defer wa.deinit();
     try wa.ensureUnusedCapacity(64);
 
     var http_client: std.http.Client = .{ .allocator = allocator, .io = mem.io() };
@@ -74,14 +117,15 @@ pub fn post(mem: *Mem, url: str, data: str) ![]u8 {
     });
     _=res;
     //if (res.status == .ok or res.status == .not_found) {
-        return wa.writer.buffered();
+        return try allocator.dupe(u8, wa.writer.buffered());
     //} else {
     //   return error.HttpFetchFail;
     //}
 }
-pub fn post2(mem: *Mem, url: str, data: str, headers: []str) ![]u8 {
+pub fn postUrl2(mem: *Mem, url: str, data: str, headers: []str) ![]u8 {
     const allocator = mem.allocator();
     var wa: std.Io.Writer.Allocating = .init(allocator);
+    defer wa.deinit();
     try wa.ensureUnusedCapacity(64);
 
     var header_buf: [20]std.http.Header = undefined;
@@ -103,7 +147,7 @@ pub fn post2(mem: *Mem, url: str, data: str, headers: []str) ![]u8 {
     });
     _=res;
     //if (res.status == .ok or res.status == .not_found) {
-        return wa.writer.buffered();
+        return try allocator.dupe(u8, wa.writer.buffered());
     //} else {
     //   return error.HttpFetchFail;
     //}
